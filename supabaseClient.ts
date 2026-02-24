@@ -29,6 +29,7 @@ export const getConfig = async (defaultConfig: AppConfig): Promise<AppConfig> =>
     if (error || !data) return defaultConfig;
 
     return {
+        id: data.id,
         schoolName: data.school_name ?? defaultConfig.schoolName,
         logoUrl: data.logo_url ?? defaultConfig.logoUrl,
         leftLogoUrl: data.left_logo_url || '', // New Mapping

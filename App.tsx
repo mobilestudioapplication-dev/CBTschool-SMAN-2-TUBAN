@@ -241,8 +241,10 @@ const App: React.FC = () => {
     const oldConfig = config;
     setConfig(newConfig);
 
+    // Use existing ID or fallback to check DB
+    const configId = newConfig.id || oldConfig?.id;
+
     const dbPayload = {
-      id: 1, 
       school_name: newConfig.schoolName,
       logo_url: newConfig.logoUrl,
       left_logo_url: newConfig.leftLogoUrl || null,
@@ -280,13 +282,76 @@ const App: React.FC = () => {
         if (rpcError) throw rpcError;
       }
 
-      const { error } = await supabase.from('app_config').update(dbPayload).eq('id', 1);
+      // 1. Try RPC Update (Most Robust, bypasses RLS if configured)
+      const { error: rpcUpdateError } = await supabase.rpc('update_app_config_v2', {
+          p_id: configId || 1,
+          p_school_name: newConfig.schoolName,
+          p_logo_url: newConfig.logoUrl,
+          p_left_logo_url: newConfig.leftLogoUrl || null,
+          p_primary_color: newConfig.primaryColor,
+          p_enable_anti_cheat: newConfig.enableAntiCheat,
+          p_anti_cheat_violation_limit: newConfig.antiCheatViolationLimit,
+          p_allow_student_manual_login: newConfig.allowStudentManualLogin,
+          p_allow_student_qr_login: newConfig.allowStudentQrLogin,
+          p_allow_admin_manual_login: newConfig.allowAdminManualLogin,
+          p_allow_admin_qr_login: newConfig.allowAdminQrLogin,
+          p_headmaster_name: newConfig.headmasterName,
+          p_headmaster_nip: newConfig.headmasterNip,
+          p_card_issue_date: newConfig.cardIssueDate,
+          p_signature_url: newConfig.signatureUrl,
+          p_stamp_url: newConfig.stampUrl,
+          p_email_domain: newConfig.emailDomain,
+          p_school_address: newConfig.schoolAddress,
+          p_school_district: newConfig.schoolDistrict,
+          p_school_code: newConfig.schoolCode,
+          p_region_code: newConfig.regionCode,
+          p_school_phone: newConfig.schoolPhone,
+          p_school_email: newConfig.schoolEmail,
+          p_school_website: newConfig.schoolWebsite,
+          p_kop_header1: newConfig.kopHeader1,
+          p_kop_header2: newConfig.kopHeader2,
+          p_default_paper_size: newConfig.defaultPaperSize,
+          p_current_exam_event: newConfig.currentExamEvent,
+          p_academic_year: newConfig.academicYear,
+          p_school_domain: newConfig.schoolDomain || ''
+      });
+
+      if (!rpcUpdateError) {
+          // Success via RPC
+          const updatedConfig = await getConfig(DEFAULT_CONFIG);
+          setConfig(updatedConfig);
+          return true;
+      }
+
+      console.warn("RPC Update failed, falling back to direct update:", rpcUpdateError);
+
+      // 2. Fallback: Direct Update (Subject to RLS)
+      let error;
+      if (configId) {
+          const { error: updateError } = await supabase.from('app_config').update(dbPayload).eq('id', configId);
+          error = updateError;
+      } else {
+          // Fallback: Check if any row exists
+          const { data: existing } = await supabase.from('app_config').select('id').limit(1).maybeSingle();
+          if (existing) {
+              const { error: updateError } = await supabase.from('app_config').update(dbPayload).eq('id', existing.id);
+              error = updateError;
+          } else {
+              const { error: insertError } = await supabase.from('app_config').insert(dbPayload);
+              error = insertError;
+          }
+      }
       
       if (error) {
         alert("Gagal menyimpan konfigurasi ke database: " + error.message);
         setConfig(oldConfig); 
         return false;
       }
+      
+      // Reload config to ensure we have the latest ID and data
+      const updatedConfig = await getConfig(DEFAULT_CONFIG);
+      setConfig(updatedConfig);
+      
       return true;
     } catch (error: any) {
       alert(`Gagal menyimpan konfigurasi: ${error.message}`);

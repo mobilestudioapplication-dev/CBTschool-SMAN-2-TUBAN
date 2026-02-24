@@ -42,6 +42,7 @@ export type QuestionType = 'multiple_choice' | 'complex_multiple_choice' | 'matc
 export type ScheduleStatus = 'Berlangsung' | 'Akan Datang' | 'Selesai';
 
 export interface AppConfig {
+  id?: number;
   schoolName: string;
   logoUrl: string;
   leftLogoUrl?: string; 
