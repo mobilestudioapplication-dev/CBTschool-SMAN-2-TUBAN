@@ -273,13 +273,18 @@ const App: React.FC = () => {
       default_paper_size: newConfig.defaultPaperSize,
       current_exam_event: newConfig.currentExamEvent,
       academic_year: newConfig.academicYear,
-      school_domain: newConfig.schoolDomain // Added
+      school_domain: newConfig.schoolDomain, // Added
+      student_data_sheet_url: newConfig.studentDataSheetUrl // Added
     };
 
     try {
       if (oldConfig && oldConfig.emailDomain !== newConfig.emailDomain) {
-        const { error: rpcError } = await supabase.rpc('admin_update_email_domain', { new_domain: newConfig.emailDomain });
-        if (rpcError) throw rpcError;
+        try {
+            const { error: rpcError } = await supabase.rpc('admin_update_email_domain', { new_domain: newConfig.emailDomain });
+            if (rpcError) throw rpcError;
+        } catch (e) {
+            console.warn("Failed to update email domain via RPC (users might not be updated):", e);
+        }
       }
 
       // 1. Try RPC Update (Most Robust, bypasses RLS if configured)
@@ -313,7 +318,8 @@ const App: React.FC = () => {
           p_default_paper_size: newConfig.defaultPaperSize,
           p_current_exam_event: newConfig.currentExamEvent,
           p_academic_year: newConfig.academicYear,
-          p_school_domain: newConfig.schoolDomain || ''
+          p_school_domain: newConfig.schoolDomain || '',
+          p_student_data_sheet_url: newConfig.studentDataSheetUrl || ''
       });
 
       if (!rpcUpdateError) {

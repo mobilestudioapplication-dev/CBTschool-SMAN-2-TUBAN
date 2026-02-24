@@ -16,6 +16,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
       return await fn();
     }
+  },
+  global: {
+    fetch: (...args) => fetch(...args),
   }
 });
 
@@ -59,6 +62,7 @@ export const getConfig = async (defaultConfig: AppConfig): Promise<AppConfig> =>
         kopHeader2: data.kop_header2 || 'DINAS PENDIDIKAN',
         currentExamEvent: data.current_exam_event || 'UJIAN SEKOLAH BERBASIS KOMPUTER',
         academicYear: data.academic_year || '2023/2024',
+        studentDataSheetUrl: data.student_data_sheet_url || '',
     };
 };
 
