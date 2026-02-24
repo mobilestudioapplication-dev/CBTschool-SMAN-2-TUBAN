@@ -1,0 +1,7 @@
+{
+  "name": "Remix: CBTschool SMAN 2 TUBAN 240226",
+  "description": "A web application framework for conducting a basic Academic Ability Test (TKA), featuring login, test confirmation, an interactive exam interface, and a completion screen.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

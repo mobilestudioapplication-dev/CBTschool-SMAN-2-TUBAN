@@ -1,0 +1,144 @@
+
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <link id="dynamic-favicon" rel="icon" type="image/png" href="https://res.cloudinary.com/dt1nrarpq/image/upload/v1771116105/Desain_tanpa_judul_6_qslcij.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    
+    <!-- Primary Meta Tags -->
+    <title>CBT Application</title>
+    <meta name="title" content="CBT School Application">
+    <meta name="description" content="Sistem Ujian Sekolah Terintegrasi Berbasis Komputer & Smartphone. Aman, Cepat, dan Terpercaya." />
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Pacifico&family=Tinos:wght@400;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <!-- HTML2PDF for Precision PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+      }
+      /* Font Times New Roman like for Documents */
+      .font-serif-print {
+        font-family: 'Tinos', 'Times New Roman', Times, serif;
+      }
+      
+      @keyframes fade-in {
+        0% { opacity: 0; }
+        100% { opacity: 1; }
+      }
+      @keyframes scale-up {
+        0% { transform: scale(0.95); opacity: 0.8; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      .animate-fade-in {
+        animation: fade-in 0.2s ease-out forwards;
+      }
+      .animate-scale-up {
+        animation: scale-up 0.2s ease-out forwards;
+      }
+      @keyframes slide-in-right {
+        from {
+          transform: translateX(100%);
+          opacity: 0;
+        }
+        to {
+          transform: translateX(0);
+          opacity: 1;
+        }
+      }
+      .animate-slide-in-right {
+        animation: slide-in-right 0.4s cubic-bezier(0.250, 0.460, 0.450, 0.940) both;
+      }
+      
+      /* --- ENTERPRISE PRINT FIXES (WYSIWYG) --- */
+      @media print {
+        @page {
+          margin: 0 !important; /* Hilangkan margin browser default */
+          size: auto;
+        }
+        
+        html, body {
+          width: 100%;
+          height: 100%;
+          margin: 0 !important;
+          padding: 0 !important;
+          background-color: white !important;
+          /* CRITICAL: Force background colors & images to print */
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          color-adjust: exact !important;
+        }
+
+        /* Sembunyikan semua elemen aplikasi utama secara default */
+        body > *:not(.print-container-root) {
+          display: none !important;
+        }
+
+        /* Kelas khusus untuk wrapper konten yang akan dicetak */
+        .print-container-root {
+          display: block !important;
+          position: absolute !important;
+          top: 0 !important;
+          left: 0 !important;
+          width: 100% !important;
+          height: auto !important;
+          z-index: 9999 !important;
+          background-color: white !important;
+        }
+        
+        .print-container-root * {
+          visibility: visible !important;
+        }
+
+        /* Hilangkan elemen utility saat cetak */
+        .no-print, header, aside, footer, nav, button, .admin-sidebar {
+          display: none !important;
+        }
+        
+        /* Force Page Breaks */
+        .page-break {
+          page-break-before: always !important;
+          break-before: page !important;
+        }
+        
+        /* Hindari pemotongan di dalam tabel/baris */
+        tr, td, th, .card-item {
+          page-break-inside: avoid !important;
+          break-inside: avoid !important;
+        }
+      }
+      
+      .font-handwriting { font-family: 'Courier New', Courier, monospace; }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "uuid": "https://aistudiocdn.com/uuid@^13.0.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.45.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.29.1",
+    "path": "https://aistudiocdn.com/path@^0.12.7",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "firebase/": "https://esm.sh/firebase@^12.9.0/",
+    "exceljs": "https://esm.sh/exceljs@^4.4.0",
+    "docx": "https://esm.sh/docx@^9.5.3",
+    "mammoth": "https://esm.sh/mammoth@^1.11.0"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
