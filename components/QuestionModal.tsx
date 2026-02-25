@@ -8,12 +8,13 @@ import { compressImage } from '../utils/imageCompression'; // Import fungsi komp
 
 interface QuestionModalProps {
   questionToEdit: Question | null;
-  onSave: (question: Omit<Question, 'id'> | Question, closeAfterSave?: boolean) => void;
+  onSave: (question: Omit<Question, 'id'> | Question, closeAfterSave?: boolean) => Promise<void>;
   onClose: () => void;
 }
 
 const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, onClose }) => {
   const [activeType, setActiveType] = useState<QuestionType>(questionToEdit?.type || 'multiple_choice');
+  const [isSaving, setIsSaving] = useState(false);
   
   // Define initial state for reuse
   const initialFormData = {
@@ -72,7 +73,7 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
 
   const handleMetadataChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: name === 'weight' ? parseInt(value) || 1 : value }));
+    setFormData(prev => ({ ...prev, [name]: name === 'weight' ? parseFloat(value) || 0 : value }));
   };
 
   // --- MATCHING LOGIC ---
@@ -146,50 +147,58 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
   };
 
   // --- SUBMIT ---
-  const handleSubmit = (closeAfterSave: boolean) => {
-    let answerKey: any = {};
-    let metadata: any = null;
-    let options: string[] = [];
-    let matchingRightOptions: string[] = []; // FIX: Prepare matching options
+  const handleSubmit = async (closeAfterSave: boolean) => {
+    setIsSaving(true);
+    try {
+        let answerKey: any = {};
+        let metadata: any = null;
+        let options: string[] = [];
+        let matchingRightOptions: string[] = []; // FIX: Prepare matching options
 
-    if (activeType === 'multiple_choice') {
-      options = formData.options.filter(o => o.trim() !== '');
-      answerKey = { index: formData.mcKey };
-    } else if (activeType === 'complex_multiple_choice') {
-      options = formData.options.filter(o => o.trim() !== '');
-      answerKey = { indices: formData.complexMcKeys };
-    } else if (activeType === 'matching') {
-      answerKey = { pairs: formData.matchingPairs };
-      metadata = { matchingLeft: formData.matchingLeft, matchingRight: formData.matchingRight };
-      // FIX: Extract right options string array for database column
-      matchingRightOptions = formData.matchingRight.map(item => item.content);
-      // For matching, 'options' usually stores the left items' content
-      options = formData.matchingLeft.map(item => item.content);
-    } else if (activeType === 'essay') {
-      answerKey = { text: formData.essayKey };
-    } else if (activeType === 'true_false') {
-        options = formData.trueFalseStatements.filter(s => s.trim() !== '');
-        answerKey = formData.trueFalseKey; 
-    }
+        if (activeType === 'multiple_choice') {
+        options = formData.options.filter(o => o.trim() !== '');
+        answerKey = { index: formData.mcKey };
+        } else if (activeType === 'complex_multiple_choice') {
+        options = formData.options.filter(o => o.trim() !== '');
+        answerKey = { indices: formData.complexMcKeys };
+        } else if (activeType === 'matching') {
+        answerKey = { pairs: formData.matchingPairs };
+        metadata = { matchingLeft: formData.matchingLeft, matchingRight: formData.matchingRight };
+        // FIX: Extract right options string array for database column
+        matchingRightOptions = formData.matchingRight.map(item => item.content);
+        // For matching, 'options' usually stores the left items' content
+        options = formData.matchingLeft.map(item => item.content);
+        } else if (activeType === 'essay') {
+        answerKey = { text: formData.essayKey };
+        } else if (activeType === 'true_false') {
+            options = formData.trueFalseStatements.filter(s => s.trim() !== '');
+            answerKey = formData.trueFalseKey; 
+        }
 
-    const payload = {
-      type: activeType,
-      question: formData.question,
-      topic: formData.topic,
-      difficulty: formData.difficulty as any,
-      weight: formData.weight,
-      options,
-      matchingRightOptions, // FIX: Include this in payload
-      answerKey,
-      metadata,
-      correctAnswerIndex: activeType === 'multiple_choice' ? formData.mcKey : 0 
-    };
+        const payload = {
+        type: activeType,
+        question: formData.question,
+        topic: formData.topic,
+        difficulty: formData.difficulty as any,
+        weight: formData.weight,
+        options,
+        matchingRightOptions, // FIX: Include this in payload
+        answerKey,
+        metadata,
+        correctAnswerIndex: activeType === 'multiple_choice' ? formData.mcKey : 0 
+        };
 
-    onSave(questionToEdit ? { ...payload, id: questionToEdit.id } : payload, closeAfterSave);
+        await onSave(questionToEdit ? { ...payload, id: questionToEdit.id } : payload, closeAfterSave);
 
-    if (!closeAfterSave && !questionToEdit) {
-        setFormData({ ...initialFormData, topic: formData.topic, difficulty: formData.difficulty }); 
-        alert("Soal berhasil disimpan. Silakan masukkan soal berikutnya.");
+        if (!closeAfterSave && !questionToEdit) {
+            setFormData({ ...initialFormData, topic: formData.topic, difficulty: formData.difficulty }); 
+            alert("Soal berhasil disimpan. Silakan masukkan soal berikutnya.");
+        }
+    } catch (error) {
+        console.error("Error saving question:", error);
+        // Error handling is mostly done in parent, but we catch here to stop loading state
+    } finally {
+        setIsSaving(false);
     }
   };
 
@@ -454,7 +463,7 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
                 </div>
                 <div>
                     <label className="block text-[10px] font-extrabold text-gray-500 uppercase tracking-widest mb-1">Bobot Soal</label>
-                    <input type="number" name="weight" value={formData.weight} onChange={handleMetadataChange} className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white" min="1" />
+                    <input type="number" name="weight" value={formData.weight} onChange={handleMetadataChange} className="w-full p-2.5 border border-gray-300 rounded-lg text-sm bg-white" min="0.1" step="0.1" />
                 </div>
             </section>
 
@@ -489,18 +498,36 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
           
           {!questionToEdit ? (
             <>
-                <button onClick={() => handleSubmit(false)} className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md flex items-center transition-all transform hover:-translate-y-0.5">
-                    <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m8-8H4" /></svg>
-                    Simpan & Tambah Lagi
+                <button onClick={() => handleSubmit(false)} disabled={isSaving} className={`px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white font-bold rounded-lg shadow-md flex items-center transition-all transform hover:-translate-y-0.5 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {isSaving ? (
+                        <>
+                            <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                            Menyimpan...
+                        </>
+                    ) : (
+                        <>
+                            <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m8-8H4" /></svg>
+                            Simpan & Tambah Lagi
+                        </>
+                    )}
                 </button>
-                <button onClick={() => handleSubmit(true)} className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md flex items-center transition-all transform hover:-translate-y-0.5">
-                    Simpan & Tutup
+                <button onClick={() => handleSubmit(true)} disabled={isSaving} className={`px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-md flex items-center transition-all transform hover:-translate-y-0.5 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                    {isSaving ? 'Menyimpan...' : 'Simpan & Tutup'}
                 </button>
             </>
           ) : (
-            <button onClick={() => handleSubmit(true)} className="px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg flex items-center transition-all transform hover:-translate-y-0.5">
-                <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                Simpan Perubahan
+            <button onClick={() => handleSubmit(true)} disabled={isSaving} className={`px-8 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg shadow-lg flex items-center transition-all transform hover:-translate-y-0.5 ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                {isSaving ? (
+                    <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        Menyimpan...
+                    </>
+                ) : (
+                    <>
+                        <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        Simpan Perubahan
+                    </>
+                )}
             </button>
           )}
         </div>

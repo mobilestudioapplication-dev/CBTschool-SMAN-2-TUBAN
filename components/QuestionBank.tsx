@@ -14,7 +14,7 @@ import { EXAM_EVENT_TYPES } from '../constants';
 interface QuestionBankProps {
   tests: Map<string, Test>;
   onAddQuestion: (token: string, question: Omit<Question, 'id'>) => Promise<boolean>;
-  onUpdateQuestion: (token: string, question: Question) => void;
+  onUpdateQuestion: (token: string, question: Question) => Promise<boolean>;
   onDeleteQuestion: (token: string, questionId: number) => void;
   onAddTest: (details: Omit<TestDetails, 'id' | 'time'>, token: string, questions: Omit<Question, 'id'>[]) => Promise<boolean>;
   onUpdateTest: (updatedTest: Test, originalToken: string) => Promise<void>;
@@ -77,7 +77,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpd
   const [testSearchTerm, setTestSearchTerm] = useState('');
   const [testSortOrder, setTestSortOrder] = useState<'default' | 'az' | 'za'>('default');
   const [filterExamType, setFilterExamType] = useState<string>('all'); 
-
+  
   useEffect(() => {
     if (preselectedToken) {
       setSelectedToken(preselectedToken);
@@ -128,8 +128,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpd
   const handleSaveQuestion = async (questionData: Omit<Question, 'id'> | Question, closeAfterSave: boolean = true) => {
     let success = false;
     if ('id' in questionData) {
-        await onUpdateQuestion(selectedToken, questionData);
-        success = true;
+        success = await onUpdateQuestion(selectedToken, questionData);
     } else {
         success = await onAddQuestion(selectedToken, questionData);
     }

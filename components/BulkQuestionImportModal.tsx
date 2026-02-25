@@ -122,7 +122,7 @@ const BulkQuestionImportModal: React.FC<BulkQuestionImportModalProps> = ({ testT
                 answer_key: null,
                 cognitive_level: (getCell(10) || 'L1') as CognitiveLevel,
                 difficulty: (getCell(11) || 'Medium') as QuestionDifficulty,
-                weight: parseFloat(getCell(12)) || 1,
+                weight: parseFloat(getCell(12).replace(',', '.')) || 1,
                 topic: getCell(13) || 'Umum'
             };
 

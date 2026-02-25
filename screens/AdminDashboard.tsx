@@ -381,7 +381,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     return true;
   };
 
-  const handleUpdateQuestion = async (token: string, q: Question) => {
+  const handleUpdateQuestion = async (token: string, q: Question): Promise<boolean> => {
     // FIX: Extract integer index for legacy column during update
     const correctIdx = q.type === 'multiple_choice' ? (q.answerKey?.index || 0) : 0;
 
@@ -399,11 +399,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       difficulty: q.difficulty, 
       topic: q.topic
     }).eq('id', q.id);
+    
     if(error) {
         showToast(`Gagal update soal: ${error.message}`, 'error');
+        return false;
     } else {
         await fetchTestsData();
         await fetchQuestionsForTest(token);
+        return true;
     }
   };
   
