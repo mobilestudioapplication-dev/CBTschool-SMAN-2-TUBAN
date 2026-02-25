@@ -606,13 +606,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         return {
             username: nisnValue + config.emailDomain, // Use Dynamic Domain
             password: nisnValue, // Default password
-            fullName: nameValue,
+            full_name: nameValue,
             nisn: nisnValue,
             class: row[classIdx]?.trim() || 'Tanpa Kelas',
             major: row[majorIdx]?.trim() || 'Tanpa Jurusan',
             gender: gender,
             religion: (religionIdx !== undefined ? row[religionIdx]?.trim() : 'Islam') || 'Islam',
-            photoUrl: (photoIdx !== undefined ? row[photoIdx]?.trim() : defaultPhoto) || defaultPhoto,
+            photo_url: (photoIdx !== undefined ? row[photoIdx]?.trim() : defaultPhoto) || defaultPhoto,
         };
       }).filter(user => user !== null);
 

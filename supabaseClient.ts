@@ -16,9 +16,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     lock: async (name: string, acquireTimeout: number, fn: () => Promise<any>) => {
       return await fn();
     }
-  },
-  global: {
-    fetch: (input, init) => fetch(input, init),
   }
 });
 
