@@ -119,10 +119,33 @@ const WordQuestionImportModal: React.FC<WordQuestionImportModalProps> = ({ testT
       // Hapus baris kosong dan baris instruksi template
       const lines = block.split('\n').map(l => l.trim()).filter(l => l.length > 0 && !l.startsWith('TEMPLATE') && !l.startsWith('ATURAN'));
       
-      const getValue = (key: string) => {
-        const line = lines.find(l => l.toUpperCase().startsWith(key.toUpperCase() + ':'));
-        return line ? line.split(/:(.*)/s)[1].trim() : '';
-      };
+      // NEW PARSING STRATEGY: Accumulate multi-line values
+      const parsedData: Record<string, string> = {};
+      let currentKey = '';
+
+      lines.forEach(line => {
+          // Regex untuk mendeteksi KEY: VALUE
+          // Mendukung: TIPE, SOAL, OPSI_A, KIRI_1, PERNYATAAN_1, dll.
+          const match = line.match(/^([A-Z_0-9]+)\s*:(.*)/);
+          
+          let isKey = false;
+          if (match) {
+              const keyCandidate = match[1].toUpperCase();
+              // Validasi apakah ini benar-benar key yang kita kenal agar tidak salah deteksi teks dalam soal
+              if (/^(TIPE|SOAL|OPSI_[A-E]|JAWABAN|KESULITAN|LEVEL|BOBOT|TOPIK|KIRI_\d+|KANAN|PERNYATAAN_\d+)$/.test(keyCandidate)) {
+                  currentKey = keyCandidate;
+                  parsedData[currentKey] = match[2].trim();
+                  isKey = true;
+              }
+          }
+
+          if (!isKey && currentKey) {
+              // Jika bukan key baru, berarti ini kelanjutan dari value key sebelumnya (multiline)
+              parsedData[currentKey] = (parsedData[currentKey] || '') + '\n' + line;
+          }
+      });
+
+      const getValue = (key: string) => (parsedData[key] || '').trim();
 
       const typeRaw = getValue('TIPE');
       const questionText = getValue('SOAL');
