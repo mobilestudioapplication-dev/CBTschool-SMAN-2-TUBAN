@@ -72,7 +72,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [classFilter, setClassFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dateFilter, setDateFilter] = useState(() => new Date().toISOString().split('T')[0]); 
+  const [dateFilter, setDateFilter] = useState(''); // Default empty to show all history 
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -452,6 +452,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                             value={dateFilter}
                             onChange={e => setDateFilter(e.target.value)}
                             className="w-full sm:w-auto px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-gray-700"
+                            placeholder="Filter Tanggal"
                         />
                         <select 
                             value={statusFilter} 
@@ -464,6 +465,14 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                             <option value="Diskualifikasi">Diskualifikasi</option>
                             <option value="Melanggar">Melanggar</option>
                         </select>
+                        {(searchTerm || classFilter !== 'all' || statusFilter !== 'all' || dateFilter) && (
+                            <button 
+                                onClick={() => { setSearchTerm(''); setClassFilter('all'); setStatusFilter('all'); setDateFilter(''); }}
+                                className="text-sm text-red-500 hover:text-red-700 font-medium whitespace-nowrap px-2"
+                            >
+                                Reset Filter
+                            </button>
+                        )}
                      </>
                  )}
                  <select 
