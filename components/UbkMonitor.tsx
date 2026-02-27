@@ -59,7 +59,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [activeSessions, setActiveSessions] = useState<StudentSession[]>([]);
   const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
   
-  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
+  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
   
   // Loading States
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -282,6 +282,21 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             const { error } = await supabase.rpc('admin_reset_device_login', { p_user_id: userId });
             if (error) throw error;
             alert(`Kunci perangkat untuk ${modalState.user.fullName} berhasil dibuka.`);
+        } else if (modalState.type === 'reset_all') {
+            // Reset Semua Login (Device Lock)
+            const userIds = activeTab === 'exam' 
+                ? filteredSessions.map(s => s.user.id) 
+                : filteredLockedUsers.map(u => u.id);
+            
+            if (userIds.length === 0) {
+                alert("Tidak ada data untuk di-reset.");
+                setModalState({ type: 'reset', session: null, user: null });
+                return;
+            }
+
+            const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
+            if (error) throw error;
+            alert(`Berhasil mereset login untuk ${userIds.length} siswa.`);
         }
         
         refreshAll(true);
@@ -297,6 +312,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'resume': return 'Lanjutkan Ujian Siswa?';
           case 'reset': return 'Reset Device & Sesi?';
           case 'unlock_device': return 'Buka Kunci Perangkat?';
+          case 'reset_all': return 'Reset Semua Login?';
           default: return '';
       }
   };
@@ -304,6 +320,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const getModalMessage = () => {
       if (modalState.type === 'unlock_device' && modalState.user) {
           return `Anda akan mereset status login untuk siswa "${modalState.user.fullName}". Ini memungkinkan siswa login kembali di perangkat baru/lain.`;
+      }
+      if (modalState.type === 'reset_all') {
+          const count = activeTab === 'exam' ? filteredSessions.length : filteredLockedUsers.length;
+          return `PERHATIAN: Anda akan mereset status login untuk ${count} siswa yang tampil di daftar ini. Siswa harus login ulang.`;
       }
       if (!modalState.session) return '';
       const name = modalState.session.user.fullName;
@@ -321,6 +341,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'resume': return 'green';
           case 'reset': return 'red';
           case 'unlock_device': return 'blue';
+          case 'reset_all': return 'red';
           default: return 'blue';
       }
   };
@@ -345,6 +366,14 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             <p className="text-gray-500 mt-1">Pantau progres dan reset login siswa yang terkendala.</p>
           </div>
           <div className="flex items-center space-x-3">
+              <button 
+                onClick={() => setModalState({ type: 'reset_all', session: null, user: null })}
+                className="hidden md:flex items-center px-3 py-2 bg-red-100 border border-red-200 rounded-full hover:bg-red-200 text-red-700 text-xs font-bold transition-all shadow-sm gap-2"
+                title="Reset Login Semua Siswa"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Reset All
+              </button>
               <button 
                 onClick={() => refreshAll(false)} 
                 className="p-2 bg-white border border-gray-200 rounded-full hover:bg-blue-50 text-gray-500 hover:text-blue-600 transition-all shadow-sm group"
