@@ -568,10 +568,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                               <td className="px-6 py-4 whitespace-nowrap">
                                   {user.isAnomaly ? (
                                       <div className="flex flex-col">
-                                          <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded w-fit">
-                                              ⚠️ Sesi Aktif (Tidak Terkunci)
+                                          <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded w-fit">
+                                              ⏳ Menunggu Login Ulang
                                           </span>
-                                          <span className="text-[10px] text-gray-400 mt-1">Siswa bisa login di device lain</span>
+                                          <span className="text-[10px] text-gray-500 mt-1">Siswa telah di-reset. Instruksikan login ulang.</span>
                                       </div>
                                   ) : (
                                       <div className="text-xs font-mono bg-gray-100 p-1 rounded max-w-[150px] truncate" title={user.activeDeviceId || ''}>{user.activeDeviceId}</div>
@@ -582,7 +582,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                   {user.isAnomaly ? (
-                                      <span className="text-xs text-gray-400 italic">Tidak perlu reset</span>
+                                      <span className="text-xs text-gray-400 italic">Menunggu siswa...</span>
                                   ) : (
                                       <button 
                                           onClick={() => setModalState({ type: 'unlock_device', user, session: null })}
@@ -638,11 +638,52 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   );
 };
 
+const CountUp = ({ value }: { value: number }) => {
+    const [displayValue, setDisplayValue] = useState(0);
+    const requestRef = useRef<number>();
+    const startTimeRef = useRef<number>();
+    const startValueRef = useRef<number>(0);
+
+    useEffect(() => {
+        startValueRef.current = displayValue;
+        startTimeRef.current = performance.now();
+        
+        const animate = (time: number) => {
+            const elapsed = time - (startTimeRef.current || time);
+            const duration = 1500; // 1.5s animation
+            const progress = Math.min(elapsed / duration, 1);
+            const ease = 1 - Math.pow(1 - progress, 4); // Ease out quart
+            
+            const current = Math.floor(startValueRef.current + (value - startValueRef.current) * ease);
+            setDisplayValue(current);
+
+            if (progress < 1) {
+                requestRef.current = requestAnimationFrame(animate);
+            } else {
+                setDisplayValue(value);
+            }
+        };
+
+        requestRef.current = requestAnimationFrame(animate);
+        return () => cancelAnimationFrame(requestRef.current!);
+    }, [value]);
+
+    return <>{displayValue}</>;
+};
+
 const SessionCard: React.FC<{session: StudentSession; onForceFinish: () => void; onReset: () => void; onResume: () => void;}> = ({ session, onForceFinish, onReset, onResume }) => {
     const { user, test, status, progress, timeLeft, violations } = session;
     // Fix 0/0 Issue: Use questionCount from details if questions array is empty (lazy loaded)
     const totalQuestions = test.questions.length > 0 ? test.questions.length : (test.details.questionCount || 0);
     const progressPercentage = totalQuestions > 0 ? (progress / totalQuestions) * 100 : 0;
+    
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => {
+        const timer = setTimeout(() => setMounted(true), 100);
+        return () => clearTimeout(timer);
+    }, []);
+
+    const displayedPercentage = mounted ? progressPercentage : 0;
     
     const isWorking = status === 'Mengerjakan';
     const isFinished = status === 'Selesai';
@@ -737,16 +778,16 @@ const SessionCard: React.FC<{session: StudentSession; onForceFinish: () => void;
                     <div>
                         <div className="flex justify-between items-end mb-2">
                             <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Progres</span>
-                            <span className="font-mono text-xs font-bold text-slate-700">{progress} <span className="text-slate-400 font-normal">/ {totalQuestions} Soal</span></span>
+                            <span className="font-mono text-xs font-bold text-slate-700"><CountUp value={progress} /> <span className="text-slate-400 font-normal">/ {totalQuestions} Soal</span></span>
                         </div>
                         <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden shadow-inner ring-1 ring-slate-200/50">
                             <div 
-                                className={`h-full transition-all duration-700 ease-out relative ${
+                                className={`h-full transition-all duration-[1500ms] ease-out relative ${
                                     isWorking ? 'bg-blue-500 animate-blue-stripes' : 
                                     isFinished ? 'bg-emerald-500' : 
                                     'bg-rose-500'
                                 }`} 
-                                style={{ width: `${progressPercentage}%` }}
+                                style={{ width: `${displayedPercentage}%` }}
                             >
                                 {isWorking && <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent w-full -translate-x-full animate-[shimmer_1.5s_infinite]"></div>}
                             </div>
