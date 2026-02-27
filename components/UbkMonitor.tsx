@@ -622,7 +622,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
         </div>
       )}
 
-      {modalState.type && (modalState.session || modalState.user) && (
+      {modalState.type && (modalState.session || modalState.user || modalState.type === 'reset_all') && (
           <ConfirmationModal 
             title={getModalTitle()} 
             message={getModalMessage()}
