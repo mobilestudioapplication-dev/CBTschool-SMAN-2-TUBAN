@@ -348,6 +348,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const { error } = await supabase.from('tests').delete().eq('id', testId); // Cascade delete should handle questions
     if(error) { showToast(`Gagal hapus ujian: ${error.message}`, 'error'); } else { await fetchTestsData(); }
   };
+
+  const handleDuplicateTest = async (token: string) => {
+    setIsProcessing(true);
+    const testId = tests.get(token)?.details.id;
+    if (!testId) {
+        showToast('Ujian tidak ditemukan.', 'error');
+        setIsProcessing(false);
+        return;
+    }
+
+    try {
+        const { data, error } = await supabase.rpc('admin_duplicate_test', { p_original_test_id: testId });
+        
+        if (error) throw error;
+        
+        if (data.success) {
+            showToast(`Berhasil duplikat! Token baru: ${data.new_token}`, 'success');
+            await fetchTestsData();
+        } else {
+            showToast(`Gagal duplikat: ${data.message}`, 'error');
+        }
+    } catch (error: any) {
+        showToast(`Error: ${error.message}`, 'error');
+    } finally {
+        setIsProcessing(false);
+    }
+  };
   
   // FIX: MANUAL ADD QUESTION LOGIC
   const handleAddQuestion = async (token: string, q: Omit<Question, 'id'>): Promise<boolean> => {
@@ -770,7 +797,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
       case AdminView.DATA_MASTER: return <DataMaster masterData={masterData} users={users} onAddItem={handleAddMasterItem} onUpdateItem={handleUpdateMasterItem} onDeleteItem={handleDeleteMasterItem} onMergeMasterData={() => {}} />;
       case AdminView.MANAJEMEN_USER: return <UserManagement />;
       case AdminView.JADWAL_UJIAN: return <ExamSchedule schedules={schedules} tests={tests} masterData={masterData} onAddSchedule={handleAddSchedule} onUpdateSchedule={handleUpdateSchedule} onDeleteSchedule={handleDeleteSchedule} />;
-      case AdminView.QUESTION_BANK: return <QuestionBank tests={tests} onAddQuestion={handleAddQuestion} onUpdateQuestion={handleUpdateQuestion} onDeleteQuestion={handleDeleteQuestion} onAddTest={handleAddTest} onUpdateTest={handleUpdateTest} onDeleteTest={handleDeleteTest} onBulkAddQuestions={handleBulkAddQuestions} onImportError={(msg) => showToast(msg, 'error')} preselectedToken={preselectedTestToken} onRefresh={() => fetchTestsData()} onFetchQuestions={fetchQuestionsForTest} isFetchingQuestions={isFetchingQuestions} />;
+      case AdminView.QUESTION_BANK: return <QuestionBank tests={tests} onAddQuestion={handleAddQuestion} onUpdateQuestion={handleUpdateQuestion} onDeleteQuestion={handleDeleteQuestion} onAddTest={handleAddTest} onUpdateTest={handleUpdateTest} onDeleteTest={handleDeleteTest} onDuplicateTest={handleDuplicateTest} onBulkAddQuestions={handleBulkAddQuestions} onImportError={(msg) => showToast(msg, 'error')} preselectedToken={preselectedTestToken} onRefresh={() => fetchTestsData()} onFetchQuestions={fetchQuestionsForTest} isFetchingQuestions={isFetchingQuestions} />;
       case AdminView.UBK: return <UbkMonitor users={users} tests={tests} />;
       case AdminView.CETAK: return <ExamCards users={studentUsers} config={config} />;
       case AdminView.CETAK_DOKUMEN: return <PrintDocuments users={studentUsers} tests={tests} examSessions={examSessions} config={config} masterData={masterData} />; // New Component

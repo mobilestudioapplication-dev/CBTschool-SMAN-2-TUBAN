@@ -19,12 +19,13 @@ interface QuestionBankProps {
   onAddTest: (details: Omit<TestDetails, 'id' | 'time'>, token: string, questions: Omit<Question, 'id'>[]) => Promise<boolean>;
   onUpdateTest: (updatedTest: Test, originalToken: string) => Promise<void>;
   onDeleteTest: (token: string) => void;
+  onDuplicateTest: (token: string) => Promise<void>; // New prop
   onBulkAddQuestions: (token: string, questions: Omit<Question, 'id'>[]) => void;
   onImportError: (message: string) => void;
   preselectedToken?: string;
   onRefresh: () => void; 
-  onFetchQuestions?: (token: string) => Promise<void>; // New prop
-  isFetchingQuestions?: boolean; // New prop
+  onFetchQuestions?: (token: string) => Promise<void>; 
+  isFetchingQuestions?: boolean; 
 }
 
 const DifficultyBadge: React.FC<{ difficulty: QuestionDifficulty }> = ({ difficulty }) => {
@@ -54,7 +55,7 @@ const ActionCard: React.FC<{title: string, description: string, icon: React.Reac
 );
 
 
-const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpdateQuestion, onDeleteQuestion, onAddTest, onUpdateTest, onDeleteTest, onBulkAddQuestions, onImportError, preselectedToken, onRefresh, onFetchQuestions, isFetchingQuestions }) => {
+const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpdateQuestion, onDeleteQuestion, onAddTest, onUpdateTest, onDeleteTest, onDuplicateTest, onBulkAddQuestions, onImportError, preselectedToken, onRefresh, onFetchQuestions, isFetchingQuestions }) => {
   const [view, setView] = useState<'main' | 'detail'>('main');
   const [selectedToken, setSelectedToken] = useState<string>(preselectedToken || '');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -66,6 +67,7 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpd
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState<Question | null>(null);
   const [testToDelete, setTestToDelete] = useState<{ token: string; name: string } | null>(null);
+  const [testToDuplicate, setTestToDuplicate] = useState<{ token: string; name: string } | null>(null);
   const [testToEdit, setTestToEdit] = useState<{ token: string; test: Test } | null>(null);
   const [previewTest, setPreviewTest] = useState<Test | null>(null);
 
@@ -194,7 +196,26 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpd
                return (
                 <div key={token} className={`relative bg-gradient-to-br ${gradient} rounded-2xl shadow-xl p-6 text-white overflow-hidden flex flex-col justify-between transform hover:-translate-y-1.5 transition-transform duration-300 ease-in-out group`}>
                   <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/10 rounded-full opacity-80"></div>
-                  <div className="absolute top-4 right-4 z-20"><button onClick={(e) => { e.stopPropagation(); setTestToDelete({ token, name: test.details.subject }); }} className="p-2 bg-black/20 hover:bg-red-600 rounded-full text-white transition-all backdrop-blur-sm"><svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></div>
+                  <div className="absolute top-4 right-4 z-20 flex gap-2">
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setTestToDuplicate({ token, name: test.details.subject }); }} 
+                        className="p-2 bg-black/20 hover:bg-blue-600 rounded-full text-white transition-all backdrop-blur-sm"
+                        title="Duplikat Mapel"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                    </button>
+                    <button 
+                        onClick={(e) => { e.stopPropagation(); setTestToDelete({ token, name: test.details.subject }); }} 
+                        className="p-2 bg-black/20 hover:bg-red-600 rounded-full text-white transition-all backdrop-blur-sm"
+                        title="Hapus Mapel"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                    </button>
+                  </div>
                   <div className="relative z-10 flex-grow flex flex-col">
                     <div className="mb-4">{icon}</div>
                     <div className="flex items-center gap-2 mb-1"><span className="text-[10px] bg-white/20 px-2 py-0.5 rounded font-mono">TOKEN: {token}</span><span className="text-[10px] bg-black/30 px-2 py-0.5 rounded font-bold uppercase truncate max-w-[150px]">{test.details.examType || 'Umum'}</span></div>
@@ -323,6 +344,22 @@ const QuestionBank: React.FC<QuestionBankProps> = ({ tests, onAddQuestion, onUpd
       )}
       
       {testToDelete && ( <ConfirmationModal title="Hapus Bank Soal" message={`Yakin hapus bank soal "${testToDelete.name}"?`} confirmText="Hapus" cancelText="Batal" onConfirm={() => { onDeleteTest(testToDelete.token); setTestToDelete(null); }} onCancel={() => setTestToDelete(null)} confirmColor="red" cancelColor="green" /> )}
+      
+      {testToDuplicate && ( 
+        <ConfirmationModal 
+            title="Duplikat Bank Soal" 
+            message={`Yakin ingin menduplikat bank soal "${testToDuplicate.name}"? Token baru akan dibuat otomatis.`} 
+            confirmText="Duplikat" 
+            cancelText="Batal" 
+            onConfirm={async () => { 
+                await onDuplicateTest(testToDuplicate.token); 
+                setTestToDuplicate(null); 
+            }} 
+            onCancel={() => setTestToDuplicate(null)} 
+            confirmColor="blue" 
+            cancelColor="gray" 
+        /> 
+      )}
     </div>
   );
 };
