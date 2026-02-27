@@ -22,8 +22,10 @@ interface LockedUser {
     fullName: string;
     nisn: string;
     class: string;
-    activeDeviceId: string;
+    activeDeviceId: string | null; // Allow null for anomaly
     lastLogin: string;
+    isAnomaly?: boolean; // New optional field
+    sessionStatus?: Status; // To show status if anomaly
 }
 
 interface UbkMonitorProps {
@@ -234,13 +236,40 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   }, [activeSessions, searchTerm, classFilter, statusFilter, dateFilter]);
 
   const filteredLockedUsers = useMemo(() => {
-      return lockedUsers.filter(u => {
+      // 1. Get real locked users
+      const realLocked = lockedUsers.filter(u => {
           const searchLower = searchTerm.toLowerCase();
           const matchesSearch = searchLower === '' || u.fullName.toLowerCase().includes(searchLower) || u.nisn.includes(searchLower);
           const matchesClass = classFilter === 'all' || u.class === classFilter;
           return matchesSearch && matchesClass;
       });
-  }, [lockedUsers, searchTerm, classFilter]);
+
+      // 2. Find users who are WORKING but NOT locked (Anomalies)
+      const lockedUserIds = new Set(lockedUsers.map(u => u.id));
+      
+      const anomalies = activeSessions
+          .filter(s => s.status === 'Mengerjakan' && !lockedUserIds.has(s.user.id))
+          .filter(s => {
+              // Apply same filters
+              const user = s.user;
+              const searchLower = searchTerm.toLowerCase();
+              const matchesSearch = searchLower === '' || user.fullName.toLowerCase().includes(searchLower) || user.nisn.includes(searchLower);
+              const matchesClass = classFilter === 'all' || user.class === classFilter;
+              return matchesSearch && matchesClass;
+          })
+          .map(s => ({
+              id: s.user.id,
+              fullName: s.user.fullName,
+              nisn: s.user.nisn,
+              class: s.user.class,
+              activeDeviceId: null,
+              lastLogin: s.startedAt, // Use session start time as proxy
+              isAnomaly: true,
+              sessionStatus: s.status
+          } as LockedUser));
+
+      return [...anomalies, ...realLocked];
+  }, [lockedUsers, activeSessions, searchTerm, classFilter]);
 
   // --- Pagination ---
   const currentDataList = activeTab === 'exam' ? filteredSessions : filteredLockedUsers;
@@ -537,19 +566,32 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                                   <div className="text-xs text-gray-500">{user.nisn}</div>
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap">
-                                  <div className="text-xs font-mono bg-gray-100 p-1 rounded max-w-[150px] truncate" title={user.activeDeviceId}>{user.activeDeviceId}</div>
+                                  {user.isAnomaly ? (
+                                      <div className="flex flex-col">
+                                          <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded w-fit">
+                                              ⚠️ Sesi Aktif (Tidak Terkunci)
+                                          </span>
+                                          <span className="text-[10px] text-gray-400 mt-1">Siswa bisa login di device lain</span>
+                                      </div>
+                                  ) : (
+                                      <div className="text-xs font-mono bg-gray-100 p-1 rounded max-w-[150px] truncate" title={user.activeDeviceId || ''}>{user.activeDeviceId}</div>
+                                  )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                   {new Date(user.lastLogin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  <button 
-                                    onClick={() => setModalState({ type: 'unlock_device', user, session: null })}
-                                    className="text-white bg-yellow-500 hover:bg-yellow-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
-                                  >
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                                      Buka Kunci
-                                  </button>
+                                  {user.isAnomaly ? (
+                                      <span className="text-xs text-gray-400 italic">Tidak perlu reset</span>
+                                  ) : (
+                                      <button 
+                                          onClick={() => setModalState({ type: 'unlock_device', user, session: null })}
+                                          className="text-white bg-yellow-500 hover:bg-yellow-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
+                                      >
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
+                                          Buka Kunci
+                                      </button>
+                                  )}
                               </td>
                           </tr>
                       ))}
