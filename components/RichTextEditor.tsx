@@ -1,6 +1,8 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { compressImage } from '../utils/imageCompression'; // Import fungsi kompresi
+import EquationModal from './EquationModal';
+import katex from 'katex';
 
 interface RichTextEditorProps {
   value: string;
@@ -22,6 +24,7 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
   const contentRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [isEquationModalOpen, setIsEquationModalOpen] = useState(false);
 
   // Sync value prop to innerHTML only if different (to prevent cursor jumping)
   useEffect(() => {
@@ -46,6 +49,21 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
 
   const handleImageClick = () => {
     fileInputRef.current?.click();
+  };
+
+  const handleEquationInsert = (latex: string) => {
+    try {
+      const html = katex.renderToString(latex, {
+        throwOnError: false,
+        displayMode: false,
+      });
+      // Wrap in a span that is not editable to treat it as an atomic unit
+      const wrappedHtml = `<span contenteditable="false" data-latex="${latex.replace(/"/g, '&quot;')}" class="mx-1 inline-block select-none align-middle" title="Equation">${html}</span>&nbsp;`;
+      execCmd('insertHTML', wrappedHtml);
+    } catch (e) {
+      console.error("KaTeX render error", e);
+      alert("Gagal merender equation.");
+    }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -78,10 +96,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
     }
   };
 
-  const ToolbarButton = ({ cmd, arg, icon, title }: { cmd: string, arg?: string, icon: React.ReactNode, title: string }) => (
+  const ToolbarButton = ({ cmd, arg, icon, title, onClick }: { cmd?: string, arg?: string, icon: React.ReactNode, title: string, onClick?: () => void }) => (
     <button
       type="button"
-      onMouseDown={(e) => { e.preventDefault(); execCmd(cmd, arg); }}
+      onMouseDown={(e) => { 
+        e.preventDefault(); 
+        if (onClick) onClick();
+        else if (cmd) execCmd(cmd, arg); 
+      }}
       className="p-1.5 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
       title={title}
     >
@@ -106,6 +128,15 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
               onChange={(e) => execCmd('foreColor', e.target.value)}
             />
         </div>
+
+        <div className="w-px h-5 bg-gray-300 mx-1"></div>
+
+        {/* Equation Button */}
+        <ToolbarButton 
+          title="Insert Equation (LaTeX)" 
+          onClick={() => setIsEquationModalOpen(true)}
+          icon={<span className="font-serif font-bold italic text-lg leading-none">∑</span>} 
+        />
 
         <div className="w-px h-5 bg-gray-300 mx-1"></div>
 
@@ -172,6 +203,14 @@ const RichTextEditor: React.FC<RichTextEditorProps> = ({
         .prose ul { list-style-type: disc; padding-left: 1.5rem; }
         .prose ol { list-style-type: decimal; padding-left: 1.5rem; }
       `}</style>
+
+      {/* Equation Modal */}
+      {isEquationModalOpen && (
+        <EquationModal
+          onSave={handleEquationInsert}
+          onClose={() => setIsEquationModalOpen(false)}
+        />
+      )}
     </div>
   );
 };

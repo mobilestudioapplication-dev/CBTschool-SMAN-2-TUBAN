@@ -2,6 +2,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import 'katex/dist/katex.min.css'; // Import KaTeX CSS globally
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
