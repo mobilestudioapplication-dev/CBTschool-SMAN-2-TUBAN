@@ -449,6 +449,40 @@ const App: React.FC = () => {
         const storedPass = dbUser.password_text || dbUser.qr_login_password || dbUser.nisn;
         if (password.trim() !== storedPass) return "Password salah.";
 
+        // --- NEW: SINGLE DEVICE AUTHENTICATION CHECK ---
+        try {
+            const deviceId = getDeviceId();
+            const deviceInfo = getDeviceInfo();
+            
+            const { data: lockResult, error: lockError } = await supabase.rpc('verify_and_lock_device', {
+                p_nisn: nisn.trim(),
+                p_device_id: deviceId,
+                p_device_info: deviceInfo
+            });
+
+            if (lockError) {
+                console.error("Device Lock Error:", lockError);
+                // Optional: Allow login if system fails? Or block?
+                // For security, we might want to block or just log.
+                // Let's block to be safe if it's a critical feature.
+                return "Gagal memverifikasi perangkat: " + lockError.message;
+            }
+
+            if (lockResult && lockResult.status === 'locked') {
+                return lockResult.message || "Akun terkunci di perangkat lain.";
+            }
+
+            if (lockResult && lockResult.status === 'error') {
+                return lockResult.message || "Terjadi kesalahan verifikasi perangkat.";
+            }
+            
+            // If status is 'success', proceed.
+        } catch (e: any) {
+            console.error("Device Verification Exception:", e);
+            return "Gagal memproses verifikasi perangkat.";
+        }
+        // -----------------------------------------------
+
         // 3. Login ke Supabase Auth (Opsional/Best Effort)
         try {
             const { error: authError } = await supabase.auth.signInWithPassword({
