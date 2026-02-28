@@ -38,7 +38,7 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
     topic: questionToEdit.topic || '',
     difficulty: questionToEdit.difficulty || 'Medium',
     weight: questionToEdit.weight || 1,
-    options: questionToEdit.options?.length ? [...questionToEdit.options, ...Array(5 - questionToEdit.options.length).fill('')].slice(0, 5) : initialFormData.options,
+    options: questionToEdit.options && questionToEdit.options.length > 0 ? questionToEdit.options : initialFormData.options,
     mcKey: typeof questionToEdit.answerKey?.index === 'number' ? questionToEdit.answerKey.index : 0,
     complexMcKeys: Array.isArray(questionToEdit.answerKey?.indices) ? questionToEdit.answerKey.indices : [],
     matchingLeft: questionToEdit.metadata?.matchingLeft || initialFormData.matchingLeft,
@@ -153,39 +153,92 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
         let answerKey: any = {};
         let metadata: any = null;
         let options: string[] = [];
-        let matchingRightOptions: string[] = []; // FIX: Prepare matching options
+        let matchingRightOptions: string[] = []; 
 
         if (activeType === 'multiple_choice') {
-        options = formData.options.filter(o => o.trim() !== '');
-        answerKey = { index: formData.mcKey };
+            const validOptions: string[] = [];
+            let newMcKey = -1;
+            
+            formData.options.forEach((opt, idx) => {
+                if (opt.trim() !== '') {
+                    validOptions.push(opt);
+                    if (idx === formData.mcKey) {
+                        newMcKey = validOptions.length - 1;
+                    }
+                }
+            });
+
+            if (validOptions.length < 2) {
+                alert("Minimal harus ada 2 opsi jawaban yang terisi.");
+                setIsSaving(false);
+                return;
+            }
+
+            if (newMcKey === -1) {
+                 // Check if the original selected option was empty
+                 if (formData.options[formData.mcKey]?.trim() === '') {
+                     alert("Opsi jawaban yang dipilih tidak boleh kosong.");
+                     setIsSaving(false);
+                     return;
+                 }
+                 // If we are here, something else is wrong or no option selected (if mcKey was invalid)
+                 // Assuming mcKey is always valid index in formData.options
+            }
+
+            options = validOptions;
+            answerKey = { index: newMcKey };
+
         } else if (activeType === 'complex_multiple_choice') {
-        options = formData.options.filter(o => o.trim() !== '');
-        answerKey = { indices: formData.complexMcKeys };
+            const validOptions: string[] = [];
+            const newComplexMcKeys: number[] = [];
+
+            formData.options.forEach((opt, idx) => {
+                if (opt.trim() !== '') {
+                    validOptions.push(opt);
+                    if (formData.complexMcKeys.includes(idx)) {
+                        newComplexMcKeys.push(validOptions.length - 1);
+                    }
+                }
+            });
+
+            if (validOptions.length < 2) {
+                alert("Minimal harus ada 2 opsi jawaban yang terisi.");
+                setIsSaving(false);
+                return;
+            }
+
+            if (newComplexMcKeys.length === 0) {
+                alert("Pilih setidaknya satu kunci jawaban.");
+                setIsSaving(false);
+                return;
+            }
+
+            options = validOptions;
+            answerKey = { indices: newComplexMcKeys };
+
         } else if (activeType === 'matching') {
-        answerKey = { pairs: formData.matchingPairs };
-        metadata = { matchingLeft: formData.matchingLeft, matchingRight: formData.matchingRight };
-        // FIX: Extract right options string array for database column
-        matchingRightOptions = formData.matchingRight.map(item => item.content);
-        // For matching, 'options' usually stores the left items' content
-        options = formData.matchingLeft.map(item => item.content);
+            answerKey = { pairs: formData.matchingPairs };
+            metadata = { matchingLeft: formData.matchingLeft, matchingRight: formData.matchingRight };
+            matchingRightOptions = formData.matchingRight.map(item => item.content);
+            options = formData.matchingLeft.map(item => item.content);
         } else if (activeType === 'essay') {
-        answerKey = { text: formData.essayKey };
+            answerKey = { text: formData.essayKey };
         } else if (activeType === 'true_false') {
             options = formData.trueFalseStatements.filter(s => s.trim() !== '');
             answerKey = formData.trueFalseKey; 
         }
 
         const payload = {
-        type: activeType,
-        question: formData.question,
-        topic: formData.topic,
-        difficulty: formData.difficulty as any,
-        weight: formData.weight,
-        options,
-        matchingRightOptions, // FIX: Include this in payload
-        answerKey,
-        metadata,
-        correctAnswerIndex: activeType === 'multiple_choice' ? formData.mcKey : 0 
+            type: activeType,
+            question: formData.question,
+            topic: formData.topic,
+            difficulty: formData.difficulty as any,
+            weight: formData.weight,
+            options,
+            matchingRightOptions, 
+            answerKey,
+            metadata,
+            correctAnswerIndex: activeType === 'multiple_choice' ? (answerKey as any).index : 0 
         };
 
         await onSave(questionToEdit ? { ...payload, id: questionToEdit.id } : payload, closeAfterSave);
@@ -196,10 +249,43 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
         }
     } catch (error) {
         console.error("Error saving question:", error);
-        // Error handling is mostly done in parent, but we catch here to stop loading state
     } finally {
         setIsSaving(false);
     }
+  };
+
+  // --- OPTION MANAGEMENT LOGIC ---
+  const addOption = () => {
+    setFormData(prev => ({
+      ...prev,
+      options: [...prev.options, '']
+    }));
+  };
+
+  const removeOption = (index: number) => {
+    if (formData.options.length <= 2) {
+      alert("Minimal harus ada 2 opsi jawaban.");
+      return;
+    }
+    setFormData(prev => {
+      const newOptions = prev.options.filter((_, i) => i !== index);
+      
+      // Adjust keys
+      let newMcKey = prev.mcKey;
+      if (prev.mcKey === index) newMcKey = 0; // Reset if selected was removed
+      else if (prev.mcKey > index) newMcKey = prev.mcKey - 1;
+
+      const newComplexMcKeys = prev.complexMcKeys
+        .filter(k => k !== index)
+        .map(k => k > index ? k - 1 : k);
+
+      return {
+        ...prev,
+        options: newOptions,
+        mcKey: newMcKey,
+        complexMcKeys: newComplexMcKeys
+      };
+    });
   };
 
   const renderTypeEditor = () => {
@@ -208,13 +294,26 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
       case 'complex_multiple_choice':
         return (
           <div className="space-y-4">
-            <label className="block text-sm font-bold text-gray-800 mb-4 flex items-center">
-              <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs mr-2">OPSI JAWABAN</span>
-              {activeType === 'multiple_choice' ? 'Pilih satu kunci jawaban' : 'Pilih satu atau lebih kunci jawaban'}
-            </label>
+            <div className="flex justify-between items-center mb-4">
+                <label className="block text-sm font-bold text-gray-800 flex items-center">
+                <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs mr-2">OPSI JAWABAN</span>
+                {activeType === 'multiple_choice' ? 'Pilih satu kunci jawaban' : 'Pilih satu atau lebih kunci jawaban'}
+                </label>
+                <button 
+                    type="button" 
+                    onClick={addOption}
+                    className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded flex items-center transition shadow-sm"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                    </svg>
+                    Tambah Opsi
+                </button>
+            </div>
+            
             {formData.options.map((opt, idx) => (
-              <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100">
-                <div className="pt-3">
+              <div key={idx} className="flex items-start gap-3 p-3 rounded-lg border border-gray-100 hover:border-blue-100 transition-colors bg-white shadow-sm">
+                <div className="pt-3 flex flex-col items-center gap-2">
                   <input 
                     type={activeType === 'multiple_choice' ? 'radio' : 'checkbox'}
                     name="ans-key"
@@ -229,9 +328,21 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
                             setFormData(p => ({ ...p, complexMcKeys: newKeys }));
                         }
                     }}
-                    className="w-5 h-5 text-blue-600 rounded"
+                    className="w-5 h-5 text-blue-600 rounded cursor-pointer"
+                    title="Tandai sebagai kunci jawaban"
                   />
-                  <div className="text-center font-bold text-gray-400 mt-1">{String.fromCharCode(65 + idx)}</div>
+                  <div className="text-center font-bold text-gray-400 text-sm">{String.fromCharCode(65 + idx)}</div>
+                  
+                  <button 
+                    type="button" 
+                    onClick={() => removeOption(idx)}
+                    className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                    title="Hapus Opsi"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
                 </div>
                 <div className="flex-grow">
                   <RichTextEditor 
@@ -249,6 +360,17 @@ const QuestionModal: React.FC<QuestionModalProps> = ({ questionToEdit, onSave, o
                 </div>
               </div>
             ))}
+            
+            <button 
+                type="button" 
+                onClick={addOption}
+                className="w-full py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 font-bold hover:border-blue-400 hover:text-blue-500 hover:bg-blue-50 transition-all flex items-center justify-center"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                </svg>
+                Tambah Opsi Jawaban
+            </button>
           </div>
         );
 
