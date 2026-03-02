@@ -188,7 +188,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         supabase.from('master_majors').select('*'),
         supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('schedules').select('*'),
-        supabase.from('student_exam_sessions').select('id, user_id, schedule_id, status, progress, time_left_seconds, violations, started_at, schedule:schedules(test_id)'),
+        supabase.from('student_exam_sessions').select('id, user_id, schedule_id, score, status, progress, time_left_seconds, violations, started_at, end_time, schedule:schedules(test_id)'),
       ]);
 
       if (usersError || testsError || classesError || majorsError || announcementsError || schedulesError || sessionsError) {
