@@ -321,13 +321,16 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const handleActionConfirm = async () => {
     try {
         if (modalState.type === 'finish' && modalState.session) {
-            await supabase.from('student_exam_sessions').update({ status: 'Selesai', time_left_seconds: 0 }).eq('id', modalState.session.id);
+            const { error: finishError } = await supabase.from('student_exam_sessions').update({ status: 'Selesai', time_left_seconds: 0 }).eq('id', modalState.session.id);
+            if (finishError) throw finishError;
         } else if (modalState.type === 'resume' && modalState.session) {
-            await supabase.from('student_exam_sessions').update({ status: 'Mengerjakan', violations: 0 }).eq('id', modalState.session.id);
+            const { error: resumeError } = await supabase.from('student_exam_sessions').update({ status: 'Mengerjakan', violations: 0 }).eq('id', modalState.session.id);
+            if (resumeError) throw resumeError;
         } else if (modalState.type === 'reset' && modalState.session) {
             // Reset dari Sesi Ujian (Full Reset)
             const userId = modalState.session.user.id;
-            await supabase.rpc('admin_reset_device_login', { p_user_id: userId });
+            const { error: resetError } = await supabase.rpc('admin_reset_device_login', { p_user_id: userId });
+            if (resetError) throw resetError;
             alert("Device berhasil di-reset. Siswa dapat login kembali.");
         } else if (modalState.type === 'unlock_device' && modalState.user) {
             // Reset dari Tab Locked Users (Hanya Device Lock)
