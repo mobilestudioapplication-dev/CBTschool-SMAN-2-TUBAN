@@ -17,8 +17,8 @@ import { DEFAULT_PROFILE_IMAGES } from './constants';
 import { getDeviceId, getDeviceInfo } from './utils/device'; 
 
 const DEFAULT_CONFIG: AppConfig = {
-  schoolName: 'SMP NEGERI 2 DEMAK', 
-  logoUrl: 'https://imersa.co.id/toko/logo/images/logo-smk-8-surabaya.png', 
+  schoolName: 'SMAN 2 TUBAN', 
+  logoUrl: 'https://res.cloudinary.com/dt1nrarpq/image/upload/v1771398439/logo_jpg-removebg-preview_ttel5m.png', 
   primaryColor: '#2563eb', 
   enableAntiCheat: true,
   antiCheatViolationLimit: 3,
