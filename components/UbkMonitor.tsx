@@ -61,7 +61,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [activeSessions, setActiveSessions] = useState<StudentSession[]>([]);
   const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
   
-  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
+  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
   
   // Loading States
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -313,10 +313,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             alert(`Kunci perangkat untuk ${modalState.user.fullName} berhasil dibuka.`);
         } else if (modalState.type === 'reset_all') {
             // Reset Semua Login (Device Lock)
-            const userIds = activeTab === 'exam' 
-                ? filteredSessions.map(s => s.user.id) 
+            const userIds = activeTab === 'exam'
+                ? filteredSessions.map(s => s.user.id)
                 : filteredLockedUsers.map(u => u.id);
-            
+
             if (userIds.length === 0) {
                 alert("Tidak ada data untuk di-reset.");
                 setModalState({ type: 'reset', session: null, user: null });
@@ -326,6 +326,20 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
             if (error) throw error;
             alert(`Berhasil mereset login untuk ${userIds.length} siswa.`);
+        } else if (modalState.type === 'unlock_all_device') {
+            // Buka Semua Kunci Perangkat (hanya yang real locked, bukan anomaly)
+            const realLockedUsers = filteredLockedUsers.filter(u => !u.isAnomaly);
+            const userIds = realLockedUsers.map(u => u.id);
+
+            if (userIds.length === 0) {
+                alert("Tidak ada perangkat terkunci yang perlu dibuka saat ini.");
+                setModalState({ type: 'reset', session: null, user: null });
+                return;
+            }
+
+            const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
+            if (error) throw error;
+            alert(`Berhasil membuka kunci perangkat untuk ${userIds.length} siswa.`);
         }
         
         refreshAll(true);
@@ -342,6 +356,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'reset': return 'Reset Device & Sesi?';
           case 'unlock_device': return 'Buka Kunci Perangkat?';
           case 'reset_all': return 'Reset Semua Login?';
+          case 'unlock_all_device': return 'Buka Semua Kunci Perangkat?';
           default: return '';
       }
   };
@@ -353,6 +368,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
       if (modalState.type === 'reset_all') {
           const count = activeTab === 'exam' ? filteredSessions.length : filteredLockedUsers.length;
           return `PERHATIAN: Anda akan mereset status login untuk ${count} siswa yang tampil di daftar ini. Siswa harus login ulang.`;
+      }
+      if (modalState.type === 'unlock_all_device') {
+          const realLockedCount = filteredLockedUsers.filter(u => !u.isAnomaly).length;
+          return `Anda akan membuka kunci perangkat untuk ${realLockedCount} siswa yang saat ini terkunci. Siswa dapat login ulang dari perangkat manapun.`;
       }
       if (!modalState.session) return '';
       const name = modalState.session.user.fullName;
@@ -371,6 +390,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'reset': return 'red';
           case 'unlock_device': return 'blue';
           case 'reset_all': return 'red';
+          case 'unlock_all_device': return 'green';
           default: return 'blue';
       }
   };
@@ -395,7 +415,18 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             <p className="text-gray-500 mt-1">Pantau progres dan reset login siswa yang terkendala.</p>
           </div>
           <div className="flex items-center space-x-3">
-              <button 
+              {/* Buka All Device — hanya aktif di tab login */}
+              <button
+                onClick={() => setModalState({ type: 'unlock_all_device', session: null, user: null })}
+                className="hidden md:flex items-center px-3 py-2 bg-green-100 border border-green-200 rounded-full hover:bg-green-200 text-green-700 text-xs font-bold transition-all shadow-sm gap-2"
+                title="Buka Semua Kunci Perangkat"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                </svg>
+                Buka All Device
+              </button>
+              <button
                 onClick={() => setModalState({ type: 'reset_all', session: null, user: null })}
                 className="hidden md:flex items-center px-3 py-2 bg-red-100 border border-red-200 rounded-full hover:bg-red-200 text-red-700 text-xs font-bold transition-all shadow-sm gap-2"
                 title="Reset Login Semua Siswa"
@@ -584,12 +615,15 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                                   {user.isAnomaly ? (
                                       <span className="text-xs text-gray-400 italic">Menunggu siswa...</span>
                                   ) : (
-                                      <button 
+                                      <button
                                           onClick={() => setModalState({ type: 'unlock_device', user, session: null })}
-                                          className="text-white bg-yellow-500 hover:bg-yellow-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
+                                          className="text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
+                                          title="Buka kunci perangkat siswa ini"
                                       >
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" /></svg>
-                                          Buka Kunci
+                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                          </svg>
+                                          Buka Device
                                       </button>
                                   )}
                               </td>
@@ -622,7 +656,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
         </div>
       )}
 
-      {modalState.type && (modalState.session || modalState.user || modalState.type === 'reset_all') && (
+      {modalState.type && (modalState.session || modalState.user || modalState.type === 'reset_all' || modalState.type === 'unlock_all_device') && (
           <ConfirmationModal 
             title={getModalTitle()} 
             message={getModalMessage()}
