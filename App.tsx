@@ -471,25 +471,20 @@ const App: React.FC = () => {
             });
 
             if (lockError) {
-                console.error("Device Lock Error:", lockError);
-                // Optional: Allow login if system fails? Or block?
-                // For security, we might want to block or just log.
-                // Let's block to be safe if it's a critical feature.
-                return "Gagal memverifikasi perangkat: " + lockError.message;
+                // Non-blocking: log warning but allow login to proceed
+                console.warn("Device Lock Warning (non-blocking):", lockError.message);
+            } else if (lockResult && lockResult.status === 'locked') {
+                // Non-blocking during exam: update device to current PC and allow login
+                console.warn("Device was locked to another device, overriding for exam:", lockResult.message);
+                // Force update device ID to current device so student can login
+                await supabase.from('users').update({
+                    active_device_id: deviceId,
+                    is_login_active: true
+                }).eq('nisn', nisn.trim());
             }
-
-            if (lockResult && lockResult.status === 'locked') {
-                return lockResult.message || "Akun terkunci di perangkat lain.";
-            }
-
-            if (lockResult && lockResult.status === 'error') {
-                return lockResult.message || "Terjadi kesalahan verifikasi perangkat.";
-            }
-            
-            // If status is 'success', proceed.
+            // If status is 'success' or 'error', proceed.
         } catch (e: any) {
-            console.error("Device Verification Exception:", e);
-            return "Gagal memproses verifikasi perangkat.";
+            console.warn("Device Verification Warning (non-blocking):", e.message);
         }
         // -----------------------------------------------
 
@@ -515,8 +510,8 @@ const App: React.FC = () => {
         });
 
         if (claimError) {
-            console.error("Session Claim Error:", claimError);
-            return "Gagal mengunci sesi perangkat. Silakan coba lagi."; // Strict enforcement
+            // Non-blocking: log warning but allow login
+            console.warn("Session Claim Warning (non-blocking):", claimError.message);
         }
         
         localStorage.setItem('cbt_session_token', sessionToken);
