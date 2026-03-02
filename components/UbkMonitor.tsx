@@ -61,7 +61,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [activeSessions, setActiveSessions] = useState<StudentSession[]>([]);
   const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
   
-  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
+  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null } | null>(null);
   
   // Loading States
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -346,6 +346,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
 
   // --- Actions ---
   const handleActionConfirm = async () => {
+    if (!modalState) return;
     try {
         if (modalState.type === 'finish' && modalState.session) {
             const { error: finishError } = await supabase.from('student_exam_sessions').update({ status: 'Selesai', time_left_seconds: 0 }).eq('id', modalState.session.id);
@@ -373,7 +374,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
 
             if (userIds.length === 0) {
                 alert("Tidak ada data untuk di-reset.");
-                setModalState({ type: 'reset', session: null, user: null });
+                setModalState(null);
                 return;
             }
 
@@ -387,7 +388,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
 
             if (userIds.length === 0) {
                 alert("Tidak ada perangkat terkunci yang perlu dibuka saat ini.");
-                setModalState({ type: 'reset', session: null, user: null });
+                setModalState(null);
                 return;
             }
 
@@ -428,10 +429,11 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
     } catch (err: any) {
         alert("Gagal melakukan aksi: " + err.message);
     }
-    setModalState({ type: 'reset', session: null, user: null });
+    setModalState(null);
   };
 
   const getModalTitle = () => {
+      if (!modalState) return '';
       switch(modalState.type) {
           case 'finish': return 'Hentikan Paksa Ujian?';
           case 'resume': return 'Lanjutkan Ujian Siswa?';
@@ -448,6 +450,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   };
 
   const getModalMessage = () => {
+      if (!modalState) return '';
       if (modalState.type === 'unlock_device' && modalState.user) {
           return `Anda akan mereset status login untuk siswa "${modalState.user.fullName}". Ini memungkinkan siswa login kembali di perangkat baru/lain.`;
       }
@@ -474,6 +477,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   };
 
   const getModalColor = () => {
+      if (!modalState) return 'blue';
       switch(modalState.type) {
           case 'finish': return 'red';
           case 'resume': return 'green';
@@ -800,15 +804,15 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
         </div>
       )}
 
-      {modalState.type && (modalState.session || modalState.user || ['reset_all', 'unlock_all_device', 'reset_selected', 'finish_selected', 'resume_selected', 'unlock_device_selected'].includes(modalState.type)) && (
-          <ConfirmationModal 
-            title={getModalTitle()} 
+      {modalState && (
+          <ConfirmationModal
+            title={getModalTitle()}
             message={getModalMessage()}
-            confirmText="YA, PROSES" 
-            cancelText="Batal" 
-            onConfirm={handleActionConfirm} 
-            onCancel={() => setModalState({ type: 'reset', session: null, user: null })} 
-            confirmColor={getModalColor() as any} 
+            confirmText="YA, PROSES"
+            cancelText="Batal"
+            onConfirm={handleActionConfirm}
+            onCancel={() => setModalState(null)}
+            confirmColor={getModalColor() as any}
             cancelColor="gray"
           />
       )}
