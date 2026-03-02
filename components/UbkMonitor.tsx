@@ -61,7 +61,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [activeSessions, setActiveSessions] = useState<StudentSession[]>([]);
   const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
   
-  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
+  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null }>({ type: 'reset', session: null, user: null });
   
   // Loading States
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -83,6 +83,9 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(12);
+
+  // Selection state
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const testMapById = useMemo(() => {
       const map = new Map<string, Test>();
@@ -300,7 +303,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const totalRecords = currentDataList.length;
   const totalPages = rowsPerPage === 0 ? 1 : Math.ceil(totalRecords / rowsPerPage);
   
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, classFilter, statusFilter, dateFilter, rowsPerPage, activeTab]);
+  useEffect(() => { setCurrentPage(1); setSelectedIds(new Set()); }, [searchTerm, classFilter, statusFilter, dateFilter, rowsPerPage, activeTab]);
 
   const paginatedData = useMemo(() => {
     if (rowsPerPage === 0) return currentDataList;
@@ -316,6 +319,30 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
       const locked = lockedUsers.length;
       return { working, finished, violations, locked };
   }, [activeSessions, lockedUsers]);
+
+  // --- Selection Helpers ---
+  const toggleSelectId = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const allFilteredIds = activeTab === 'exam'
+    ? new Set(filteredSessions.map(s => s.id))
+    : new Set(filteredLockedUsers.map(u => u.id));
+
+  const isAllSelected = allFilteredIds.size > 0 && [...allFilteredIds].every(id => selectedIds.has(id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(allFilteredIds));
+    }
+  };
 
   // --- Actions ---
   const handleActionConfirm = async () => {
@@ -367,8 +394,36 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
             if (error) throw error;
             alert(`Berhasil membuka kunci perangkat untuk ${userIds.length} siswa.`);
+        } else if (modalState.type === 'reset_selected') {
+            const userIds = filteredSessions.filter(s => selectedIds.has(s.id)).map(s => s.user.id);
+            if (userIds.length === 0) { alert('Tidak ada siswa yang dipilih.'); return; }
+            const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
+            if (error) throw error;
+            setSelectedIds(new Set());
+            alert(`Berhasil mereset device untuk ${userIds.length} siswa.`);
+        } else if (modalState.type === 'finish_selected') {
+            const sessionIds = filteredSessions.filter(s => selectedIds.has(s.id)).map(s => s.id);
+            if (sessionIds.length === 0) { alert('Tidak ada siswa yang dipilih.'); return; }
+            const { error } = await supabase.from('student_exam_sessions').update({ status: 'Selesai', time_left_seconds: 0 }).in('id', sessionIds);
+            if (error) throw error;
+            setSelectedIds(new Set());
+            alert(`Berhasil menghentikan ujian untuk ${sessionIds.length} siswa.`);
+        } else if (modalState.type === 'resume_selected') {
+            const sessionIds = filteredSessions.filter(s => selectedIds.has(s.id)).map(s => s.id);
+            if (sessionIds.length === 0) { alert('Tidak ada siswa yang dipilih.'); return; }
+            const { error } = await supabase.from('student_exam_sessions').update({ status: 'Mengerjakan', violations: 0 }).in('id', sessionIds);
+            if (error) throw error;
+            setSelectedIds(new Set());
+            alert(`Berhasil melanjutkan ujian untuk ${sessionIds.length} siswa.`);
+        } else if (modalState.type === 'unlock_device_selected') {
+            const userIds = filteredLockedUsers.filter(u => selectedIds.has(u.id)).map(u => u.id);
+            if (userIds.length === 0) { alert('Tidak ada siswa yang dipilih.'); return; }
+            const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
+            if (error) throw error;
+            setSelectedIds(new Set());
+            alert(`Berhasil membuka kunci perangkat untuk ${userIds.length} siswa.`);
         }
-        
+
         refreshAll(true);
     } catch (err: any) {
         alert("Gagal melakukan aksi: " + err.message);
@@ -384,6 +439,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'unlock_device': return 'Buka Kunci Perangkat?';
           case 'reset_all': return 'Reset Semua Login?';
           case 'unlock_all_device': return 'Buka Semua Kunci Perangkat?';
+          case 'reset_selected': return `Reset Device ${selectedIds.size} Siswa Terpilih?`;
+          case 'finish_selected': return `Stop Ujian ${selectedIds.size} Siswa Terpilih?`;
+          case 'resume_selected': return `Lanjutkan Ujian ${selectedIds.size} Siswa Terpilih?`;
+          case 'unlock_device_selected': return `Buka Device ${selectedIds.size} Siswa Terpilih?`;
           default: return '';
       }
   };
@@ -400,6 +459,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           const realLockedCount = filteredLockedUsers.filter(u => !u.isAnomaly).length;
           return `Anda akan membuka kunci perangkat untuk ${realLockedCount} siswa yang saat ini terkunci. Siswa dapat login ulang dari perangkat manapun.`;
       }
+      if (modalState.type === 'reset_selected') return `Anda akan mereset kunci device untuk ${selectedIds.size} siswa yang dipilih. Siswa harus login ulang dari perangkat manapun.`;
+      if (modalState.type === 'finish_selected') return `PERHATIAN: Anda akan menghentikan paksa ujian untuk ${selectedIds.size} siswa yang dipilih.`;
+      if (modalState.type === 'resume_selected') return `Anda akan mereset pelanggaran dan melanjutkan ujian untuk ${selectedIds.size} siswa yang dipilih.`;
+      if (modalState.type === 'unlock_device_selected') return `Anda akan membuka kunci perangkat untuk ${selectedIds.size} siswa yang dipilih. Siswa dapat login dari perangkat manapun.`;
       if (!modalState.session) return '';
       const name = modalState.session.user.fullName;
       switch(modalState.type) {
@@ -418,6 +481,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'unlock_device': return 'blue';
           case 'reset_all': return 'red';
           case 'unlock_all_device': return 'green';
+          case 'reset_selected': return 'red';
+          case 'finish_selected': return 'red';
+          case 'resume_selected': return 'green';
+          case 'unlock_device_selected': return 'green';
           default: return 'blue';
       }
   };
@@ -574,17 +641,58 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
       </div>
 
       {/* VIEW CONTENT */}
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mb-4 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={toggleSelectAll} className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${isAllSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-400'}`}>
+              {isAllSelected && <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+            </button>
+            <span className="text-sm font-bold text-blue-700">{selectedIds.size} siswa dipilih</span>
+            <button onClick={() => setSelectedIds(new Set())} className="text-xs text-gray-400 hover:text-gray-600 underline">Batal pilih</button>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {activeTab === 'exam' ? (
+              <>
+                <button onClick={() => setModalState({ type: 'reset_selected', session: null })} className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-lg transition-colors">
+                  Reset Device ({selectedIds.size})
+                </button>
+                <button onClick={() => setModalState({ type: 'resume_selected', session: null })} className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded-lg transition-colors">
+                  Lanjutkan ({selectedIds.size})
+                </button>
+                <button onClick={() => setModalState({ type: 'finish_selected', session: null })} className="px-3 py-1.5 bg-red-500 hover:bg-red-600 text-white text-xs font-bold rounded-lg transition-colors">
+                  Stop Ujian ({selectedIds.size})
+                </button>
+              </>
+            ) : (
+              <button onClick={() => setModalState({ type: 'unlock_device_selected', session: null })} className="px-3 py-1.5 bg-green-500 hover:bg-green-600 text-white text-xs font-bold rounded-lg transition-colors">
+                Buka Device ({selectedIds.size})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeTab === 'exam' ? (
           <>
+            {/* Select All row for exam tab when no selections yet */}
+            {selectedIds.size === 0 && filteredSessions.length > 0 && (
+              <div className="mb-3 flex items-center gap-2">
+                <button onClick={toggleSelectAll} className="w-4 h-4 rounded border-2 border-gray-300 hover:border-blue-400 bg-white flex items-center justify-center transition-all flex-shrink-0" />
+                <span className="text-xs text-gray-400">Klik checkbox pada kartu untuk memilih siswa</span>
+              </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {paginatedData.map(item => ( 
-                    <SessionCard 
-                        key={(item as StudentSession).id} 
-                        session={item as StudentSession} 
-                        onForceFinish={() => setModalState({ type: 'finish', session: item as StudentSession })} 
-                        onReset={() => setModalState({ type: 'reset', session: item as StudentSession })} 
+                {paginatedData.map(item => (
+                    <SessionCard
+                        key={(item as StudentSession).id}
+                        session={item as StudentSession}
+                        onForceFinish={() => setModalState({ type: 'finish', session: item as StudentSession })}
+                        onReset={() => setModalState({ type: 'reset', session: item as StudentSession })}
                         onResume={() => setModalState({ type: 'resume', session: item as StudentSession })}
-                    /> 
+                        isSelected={selectedIds.has((item as StudentSession).id)}
+                        onToggleSelect={() => toggleSelectId((item as StudentSession).id)}
+                    />
                 ))}
             </div>
             {(paginatedData as StudentSession[]).length === 0 && (
@@ -603,6 +711,11 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
               <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-yellow-50">
                       <tr>
+                          <th className="px-4 py-3 text-left w-10">
+                              <button onClick={toggleSelectAll} className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${isAllSelected ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-400 hover:border-blue-400'}`}>
+                                  {isAllSelected && <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                              </button>
+                          </th>
                           <th className="px-6 py-3 text-left text-xs font-bold text-yellow-800 uppercase tracking-wider">Nama Siswa</th>
                           <th className="px-6 py-3 text-left text-xs font-bold text-yellow-800 uppercase tracking-wider">Kelas / NISN</th>
                           <th className="px-6 py-3 text-left text-xs font-bold text-yellow-800 uppercase tracking-wider">Device ID</th>
@@ -612,10 +725,15 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                       {(paginatedData as LockedUser[]).length === 0 && (
-                          <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-500">Tidak ada siswa yang terkunci saat ini.</td></tr>
+                          <tr><td colSpan={6} className="px-6 py-10 text-center text-gray-500">Tidak ada siswa yang terkunci saat ini.</td></tr>
                       )}
                       {(paginatedData as LockedUser[]).map(user => (
-                          <tr key={user.id} className="hover:bg-gray-50">
+                          <tr key={user.id} className={`hover:bg-gray-50 ${selectedIds.has(user.id) ? 'bg-blue-50' : ''}`}>
+                              <td className="px-4 py-4">
+                                  <button onClick={() => toggleSelectId(user.id)} className={`w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${selectedIds.has(user.id) ? 'bg-blue-500 border-blue-500' : 'bg-white border-gray-300 hover:border-blue-400'}`}>
+                                      {selectedIds.has(user.id) && <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>}
+                                  </button>
+                              </td>
                               <td className="px-6 py-4 whitespace-nowrap">
                                   <div className="text-sm font-bold text-gray-900">{user.fullName}</div>
                               </td>
@@ -682,7 +800,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
         </div>
       )}
 
-      {modalState.type && (modalState.session || modalState.user || modalState.type === 'reset_all' || modalState.type === 'unlock_all_device') && (
+      {modalState.type && (modalState.session || modalState.user || ['reset_all', 'unlock_all_device', 'reset_selected', 'finish_selected', 'resume_selected', 'unlock_device_selected'].includes(modalState.type)) && (
           <ConfirmationModal 
             title={getModalTitle()} 
             message={getModalMessage()}
@@ -731,7 +849,7 @@ const CountUp = ({ value }: { value: number }) => {
     return <>{displayValue}</>;
 };
 
-const SessionCard: React.FC<{session: StudentSession; onForceFinish: () => void; onReset: () => void; onResume: () => void;}> = ({ session, onForceFinish, onReset, onResume }) => {
+const SessionCard: React.FC<{session: StudentSession; onForceFinish: () => void; onReset: () => void; onResume: () => void; isSelected: boolean; onToggleSelect: () => void;}> = ({ session, onForceFinish, onReset, onResume, isSelected, onToggleSelect }) => {
     const { user, test, status, progress, timeLeft, violations } = session;
     // Fix 0/0 Issue: Use questionCount from details if questions array is empty (lazy loaded)
     const totalQuestions = test.questions.length > 0 ? test.questions.length : (test.details.questionCount || 0);
@@ -750,7 +868,19 @@ const SessionCard: React.FC<{session: StudentSession; onForceFinish: () => void;
     const isDisqualified = status === 'Diskualifikasi';
 
     return (
-        <div className={`group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border border-slate-100 ${isWorking ? 'ring-2 ring-blue-400/30' : ''}`}>
+        <div className={`group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden border ${isSelected ? 'border-blue-400 ring-2 ring-blue-300/50' : 'border-slate-100'} ${isWorking ? 'ring-2 ring-blue-400/30' : ''}`}>
+            {/* Selection Checkbox */}
+            <button
+                onClick={e => { e.stopPropagation(); onToggleSelect(); }}
+                className={`absolute top-3 left-3 z-10 w-5 h-5 rounded border-2 flex items-center justify-center transition-all shadow-sm ${isSelected ? 'bg-blue-500 border-blue-500' : 'bg-white/90 border-gray-300 hover:border-blue-400'}`}
+                title="Pilih siswa ini"
+            >
+                {isSelected && (
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                )}
+            </button>
             {/* Add styles for progress animation */}
             <style>{`
                 @keyframes progress-stripes {
