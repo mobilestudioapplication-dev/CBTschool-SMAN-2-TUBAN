@@ -487,7 +487,14 @@ const TestScreen: React.FC<TestScreenProps> = ({ onFinishTest, user, onLogout, q
   const handleUpdateAnswer = async (qId: number, val: any, isUnsure?: boolean) => {
     if (isDisqualified) return;
     
-    // 1. Optimistic Local Update (Instant UI Feedback)
+    // 1. Check if the answer has actually changed to avoid redundant saves
+    const currentAns = answers[qId];
+    const isValueChanged = JSON.stringify(currentAns?.value) !== JSON.stringify(val);
+    const isUnsureChanged = isUnsure !== undefined && currentAns?.unsure !== isUnsure;
+    
+    if (!isValueChanged && !isUnsureChanged) return;
+
+    // 2. Optimistic Local Update (Instant UI Feedback)
     let newUnsure = false;
     setAnswers(prev => {
         const current = prev[qId] || { value: null, unsure: false };
@@ -500,19 +507,17 @@ const TestScreen: React.FC<TestScreenProps> = ({ onFinishTest, user, onLogout, q
         return newState;
     });
 
-    // 2. Intelligent Auto-Save (Debounce for Essays, Instant for others)
+    // 3. Intelligent Auto-Save (Debounce to prevent spamming the server)
     const qType = questions.find(q => q.id === qId)?.type;
     
-    if (qType === 'essay') {
-        if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
-        setSaveStatus('saving'); // Indicate pending
-        saveDebounceRef.current = setTimeout(() => {
-            saveToSupabase(qId, val, newUnsure);
-        }, 1500); // 1.5s delay for text input
-    } else {
-        // Immediate save for multiple choice / matching
+    if (saveDebounceRef.current) clearTimeout(saveDebounceRef.current);
+    setSaveStatus('saving'); // Indicate pending
+    
+    const debounceTime = qType === 'essay' ? 1500 : 400; // 1.5s for essay, 0.4s for others
+    
+    saveDebounceRef.current = setTimeout(() => {
         saveToSupabase(qId, val, newUnsure);
-    }
+    }, debounceTime);
   };
 
   // --- Matching Coordinate Logic ---

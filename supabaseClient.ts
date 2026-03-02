@@ -19,7 +19,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+let configCache: AppConfig | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 60000; // 1 minute cache
+
 export const getConfig = async (defaultConfig: AppConfig): Promise<AppConfig> => {
+    const now = Date.now();
+    if (configCache && (now - lastFetchTime < CACHE_DURATION)) {
+        return configCache;
+    }
+
     const { data, error } = await supabase
         .from('app_config')
         .select('*')
@@ -28,7 +37,7 @@ export const getConfig = async (defaultConfig: AppConfig): Promise<AppConfig> =>
         
     if (error || !data) return defaultConfig;
 
-    return {
+    const config = {
         id: data.id,
         schoolName: data.school_name ?? defaultConfig.schoolName,
         logoUrl: data.logo_url ?? defaultConfig.logoUrl,
@@ -61,6 +70,10 @@ export const getConfig = async (defaultConfig: AppConfig): Promise<AppConfig> =>
         academicYear: data.academic_year || '2023/2024',
         studentDataSheetUrl: data.student_data_sheet_url || '',
     };
+
+    configCache = config;
+    lastFetchTime = now;
+    return config;
 };
 
 const normalizeStr = (str: string | undefined | null): string => {

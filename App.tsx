@@ -63,6 +63,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const fetchAppConfig = async () => {
+      // Set a timeout for config loading to prevent infinite spinner
+      const timeoutId = setTimeout(() => {
+        if (isConfigLoading) {
+          console.warn("Config load timed out. Using default.");
+          setConfig(DEFAULT_CONFIG);
+          setIsConfigLoading(false);
+        }
+      }, 5000);
+
       try {
         const appConfig = await getConfig(DEFAULT_CONFIG);
         if (appConfig.enableAntiCheat === undefined) {
@@ -73,6 +82,7 @@ const App: React.FC = () => {
         console.warn("Config load failed. Using default.", error);
         setConfig(DEFAULT_CONFIG);
       } finally {
+        clearTimeout(timeoutId);
         setIsConfigLoading(false);
       }
     };
@@ -398,8 +408,8 @@ const App: React.FC = () => {
       checkSession();
 
       // 2. Polling Interval (Robust Fallback for Realtime)
-      // Check every 5 seconds to ensure single device enforcement
-      const intervalId = setInterval(checkSession, 5000);
+      // Check every 30 seconds to ensure single device enforcement (Reduced from 5s for performance)
+      const intervalId = setInterval(checkSession, 30000);
 
       // 3. Realtime Subscription (Fast Reaction)
       const channel = supabase
