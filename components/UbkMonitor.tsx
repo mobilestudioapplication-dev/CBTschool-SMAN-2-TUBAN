@@ -626,30 +626,29 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
                                           <span className="text-xs font-bold text-orange-600 bg-orange-50 px-2 py-1 rounded w-fit">
                                               ⏳ Menunggu Login Ulang
                                           </span>
-                                          <span className="text-[10px] text-gray-500 mt-1">Siswa telah di-reset. Instruksikan login ulang.</span>
+                                          <span className="text-[10px] text-gray-500 mt-1">Belum terkunci ke perangkat manapun.</span>
                                       </div>
                                   ) : (
-                                      <div className="text-xs font-mono bg-gray-100 p-1 rounded max-w-[150px] truncate" title={user.activeDeviceId || ''}>{user.activeDeviceId}</div>
+                                      <div className="flex flex-col gap-0.5">
+                                          <div className="text-xs font-mono bg-gray-100 px-2 py-1 rounded border border-gray-200 text-gray-700 max-w-[200px] truncate" title={user.activeDeviceId || ''}>{user.activeDeviceId}</div>
+                                          <span className="text-[10px] text-gray-400">ID Perangkat Aktif</span>
+                                      </div>
                                   )}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                   {new Date(user.lastLogin).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                  {user.isAnomaly ? (
-                                      <span className="text-xs text-gray-400 italic">Menunggu siswa...</span>
-                                  ) : (
-                                      <button
-                                          onClick={() => setModalState({ type: 'unlock_device', user, session: null })}
-                                          className="text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
-                                          title="Buka kunci perangkat siswa ini"
-                                      >
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
-                                          </svg>
-                                          Buka Device
-                                      </button>
-                                  )}
+                                  <button
+                                      onClick={() => setModalState({ type: 'unlock_device', user, session: null })}
+                                      className="text-white bg-green-500 hover:bg-green-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm transition-colors flex items-center gap-1 ml-auto"
+                                      title="Buka kunci perangkat siswa ini"
+                                  >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                                      </svg>
+                                      Buka Device
+                                  </button>
                               </td>
                           </tr>
                       ))}
