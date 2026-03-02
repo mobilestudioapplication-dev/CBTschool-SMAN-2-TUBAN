@@ -61,7 +61,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [activeSessions, setActiveSessions] = useState<StudentSession[]>([]);
   const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
   
-  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null } | null>(null);
+  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device' | 'unlock_all_device_global' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null } | null>(null);
   
   // Loading States
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -395,6 +395,11 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
             if (error) throw error;
             alert(`Berhasil membuka kunci perangkat untuk ${userIds.length} siswa.`);
+        } else if (modalState.type === 'unlock_all_device_global') {
+            // Reset SEMUA device lock untuk SEMUA siswa (tanpa filter)
+            const { data: resetCount, error } = await supabase.rpc('admin_reset_all_device_logins_global');
+            if (error) throw error;
+            alert(`Berhasil membuka kunci perangkat untuk ${resetCount ?? 'semua'} siswa. Semua siswa kini bisa login.`);
         } else if (modalState.type === 'reset_selected') {
             const userIds = filteredSessions.filter(s => selectedIds.has(s.id)).map(s => s.user.id);
             if (userIds.length === 0) { alert('Tidak ada siswa yang dipilih.'); return; }
@@ -441,6 +446,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'unlock_device': return 'Buka Kunci Perangkat?';
           case 'reset_all': return 'Reset Semua Login?';
           case 'unlock_all_device': return 'Buka Semua Kunci Perangkat?';
+          case 'unlock_all_device_global': return 'Reset Semua Device (Global)?';
           case 'reset_selected': return `Reset Device ${selectedIds.size} Siswa Terpilih?`;
           case 'finish_selected': return `Stop Ujian ${selectedIds.size} Siswa Terpilih?`;
           case 'resume_selected': return `Lanjutkan Ujian ${selectedIds.size} Siswa Terpilih?`;
@@ -461,6 +467,9 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
       if (modalState.type === 'unlock_all_device') {
           const realLockedCount = filteredLockedUsers.filter(u => !u.isAnomaly).length;
           return `Anda akan membuka kunci perangkat untuk ${realLockedCount} siswa yang saat ini terkunci. Siswa dapat login ulang dari perangkat manapun.`;
+      }
+      if (modalState.type === 'unlock_all_device_global') {
+          return 'PERHATIAN: Ini akan membuka kunci perangkat untuk SEMUA siswa di seluruh sistem, termasuk yang tidak tampil di filter. Gunakan ini jika banyak siswa tidak bisa login saat ujian.';
       }
       if (modalState.type === 'reset_selected') return `Anda akan mereset kunci device untuk ${selectedIds.size} siswa yang dipilih. Siswa harus login ulang dari perangkat manapun.`;
       if (modalState.type === 'finish_selected') return `PERHATIAN: Anda akan menghentikan paksa ujian untuk ${selectedIds.size} siswa yang dipilih.`;
@@ -485,6 +494,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'unlock_device': return 'blue';
           case 'reset_all': return 'red';
           case 'unlock_all_device': return 'green';
+          case 'unlock_all_device_global': return 'green';
           case 'reset_selected': return 'red';
           case 'finish_selected': return 'red';
           case 'resume_selected': return 'green';
@@ -513,7 +523,18 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             <p className="text-gray-500 mt-1">Pantau progres dan reset login siswa yang terkendala.</p>
           </div>
           <div className="flex items-center space-x-3">
-              {/* Buka All Device — hanya aktif di tab login */}
+              {/* Reset Global — untuk darurat ketika banyak siswa tidak bisa login */}
+              <button
+                onClick={() => setModalState({ type: 'unlock_all_device_global', session: null, user: null })}
+                className="hidden md:flex items-center px-3 py-2 bg-emerald-600 border border-emerald-700 rounded-full hover:bg-emerald-700 text-white text-xs font-bold transition-all shadow-sm gap-2"
+                title="Reset Semua Device Lock (Global) — Gunakan saat ujian jika banyak siswa tidak bisa login"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 11V7a4 4 0 118 0m-4 8v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2z" />
+                </svg>
+                Reset Semua Device
+              </button>
+              {/* Buka All Device — hanya untuk yang terfilter */}
               <button
                 onClick={() => setModalState({ type: 'unlock_all_device', session: null, user: null })}
                 className="hidden md:flex items-center px-3 py-2 bg-green-100 border border-green-200 rounded-full hover:bg-green-200 text-green-700 text-xs font-bold transition-all shadow-sm gap-2"
