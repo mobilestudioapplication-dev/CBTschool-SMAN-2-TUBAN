@@ -61,7 +61,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   const [activeSessions, setActiveSessions] = useState<StudentSession[]>([]);
   const [lockedUsers, setLockedUsers] = useState<LockedUser[]>([]);
   
-  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'unlock_all_device' | 'unlock_all_device_global' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null } | null>(null);
+  const [modalState, setModalState] = useState<{ type: 'reset' | 'finish' | 'resume' | 'unlock_device' | 'reset_all' | 'finish_all' | 'unlock_all_device' | 'unlock_all_device_global' | 'reset_selected' | 'finish_selected' | 'resume_selected' | 'unlock_device_selected'; session: StudentSession | null; user?: LockedUser | null } | null>(null);
   
   // Loading States
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -381,6 +381,19 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
             const { error } = await supabase.rpc('admin_reset_all_device_logins', { p_user_ids: userIds });
             if (error) throw error;
             alert(`Berhasil mereset login untuk ${userIds.length} siswa.`);
+        } else if (modalState.type === 'finish_all') {
+            // Selesaikan Semua Ujian yang sedang aktif (dari filter saat ini)
+            const activeSesionIds = filteredSessions.filter(s => s.status === 'Mengerjakan').map(s => s.id);
+
+            if (activeSesionIds.length === 0) {
+                alert("Tidak ada sesi ujian aktif yang perlu diselesaikan.");
+                setModalState(null);
+                return;
+            }
+
+            const { error } = await supabase.from('student_exam_sessions').update({ status: 'Selesai', time_left_seconds: 0 }).in('id', activeSesionIds);
+            if (error) throw error;
+            alert(`Berhasil menyelesaikan ujian untuk ${activeSesionIds.length} siswa.`);
         } else if (modalState.type === 'unlock_all_device') {
             // Buka Semua Kunci Perangkat (hanya yang real locked, bukan anomaly)
             const realLockedUsers = filteredLockedUsers.filter(u => !u.isAnomaly);
@@ -445,6 +458,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'reset': return 'Reset Device & Sesi?';
           case 'unlock_device': return 'Buka Kunci Perangkat?';
           case 'reset_all': return 'Reset Semua Login?';
+          case 'finish_all': return 'Selesaikan Semua Ujian Aktif?';
           case 'unlock_all_device': return 'Buka Semua Kunci Perangkat?';
           case 'unlock_all_device_global': return 'Reset Semua Device (Global)?';
           case 'reset_selected': return `Reset Device ${selectedIds.size} Siswa Terpilih?`;
@@ -463,6 +477,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
       if (modalState.type === 'reset_all') {
           const count = activeTab === 'exam' ? filteredSessions.length : filteredLockedUsers.length;
           return `PERHATIAN: Anda akan mereset status login untuk ${count} siswa yang tampil di daftar ini. Siswa harus login ulang.`;
+      }
+      if (modalState.type === 'finish_all') {
+          const activeCount = filteredSessions.filter(s => s.status === 'Mengerjakan').length;
+          return `PERHATIAN: Anda akan menghentikan paksa ujian untuk ${activeCount} siswa yang sedang aktif mengerjakan. Status mereka akan diubah menjadi 'Selesai'.`;
       }
       if (modalState.type === 'unlock_all_device') {
           const realLockedCount = filteredLockedUsers.filter(u => !u.isAnomaly).length;
@@ -493,6 +511,7 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
           case 'reset': return 'red';
           case 'unlock_device': return 'blue';
           case 'reset_all': return 'red';
+          case 'finish_all': return 'red';
           case 'unlock_all_device': return 'green';
           case 'unlock_all_device_global': return 'green';
           case 'reset_selected': return 'red';
@@ -552,6 +571,14 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                 Reset All
+              </button>
+              <button
+                onClick={() => setModalState({ type: 'finish_all', session: null, user: null })}
+                className="hidden md:flex items-center px-3 py-2 bg-rose-600 border border-rose-700 rounded-full hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-sm gap-2"
+                title="Selesaikan Semua Ujian Aktif — Hentikan paksa semua sesi yang sedang berjalan"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                Finish All
               </button>
               <button 
                 onClick={() => refreshAll(false)} 
