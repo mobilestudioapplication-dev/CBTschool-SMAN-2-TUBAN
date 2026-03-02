@@ -69,6 +69,10 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
   
   const [schedules, setSchedules] = useState<any[]>([]);
   const refreshIntervalRef = useRef<number | null>(null);
+  const isFetchingSessionsRef = useRef(false);
+  const isFetchingLockedRef = useRef(false);
+  const debounceSessionsRef = useRef<number | null>(null);
+  const debounceLockedRef = useRef<number | null>(null);
 
   // Filter state
   const [searchTerm, setSearchTerm] = useState('');
@@ -105,10 +109,15 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
 
   // 1. Fetch Exam Sessions
   const fetchSessions = async (silent = false) => {
+        if (isFetchingSessionsRef.current) return; // Skip jika sedang fetch
+        isFetchingSessionsRef.current = true;
+
         if (!silent) setIsInitialLoading(true);
         else setIsRefreshing(true);
 
-        const { data, error } = await supabase.from('student_exam_sessions').select('*');
+        const { data, error } = await supabase
+            .from('student_exam_sessions')
+            .select('id, user_id, schedule_id, status, progress, time_left_seconds, violations, started_at');
         
         if (data) {
              const mapped = data.map(d => {
@@ -137,16 +146,20 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
         
         if (!silent) setIsInitialLoading(false);
         else setIsRefreshing(false);
+        isFetchingSessionsRef.current = false;
   };
 
   // 2. Fetch Locked Users (NEW FEATURE)
   const fetchLockedUsers = async (silent = false) => {
+      if (isFetchingLockedRef.current) return; // Skip jika sedang fetch
+      isFetchingLockedRef.current = true;
+
       if (!silent) setIsInitialLoading(true);
-      
-      // Ambil user yang active_device_id-nya tidak null
+
+      // Ambil hanya kolom yang diperlukan — BUKAN select('*') untuk efisiensi
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select('id, full_name, nisn, class, active_device_id, updated_at')
         .not('active_device_id', 'is', null);
 
       if (data) {
@@ -162,12 +175,23 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
       }
       
       if (!silent) setIsInitialLoading(false);
+      isFetchingLockedRef.current = false;
   };
 
   // Wrapper untuk refresh semua
   const refreshAll = (silent = true) => {
       fetchSessions(silent);
       fetchLockedUsers(silent);
+  };
+
+  // Debounced versions untuk realtime subscription (mencegah ratusan panggilan bersamaan)
+  const debouncedFetchSessions = () => {
+      if (debounceSessionsRef.current) clearTimeout(debounceSessionsRef.current);
+      debounceSessionsRef.current = window.setTimeout(() => fetchSessions(true), 400);
+  };
+  const debouncedFetchLockedUsers = () => {
+      if (debounceLockedRef.current) clearTimeout(debounceLockedRef.current);
+      debounceLockedRef.current = window.setTimeout(() => fetchLockedUsers(true), 400);
   };
 
   // --- REALTIME & INTERVAL SETUP ---
@@ -179,13 +203,13 @@ const UbkMonitor: React.FC<UbkMonitorProps> = ({ users, tests }) => {
     // Kita set interval, tapi function fetchSessions TIDAK BOLEH set loading=true jika silent=true
     refreshIntervalRef.current = window.setInterval(() => {
         refreshAll(true);
-    }, 5000); // Refresh setiap 5 detik
+    }, 15000); // Polling setiap 15 detik (realtime handle update instan)
 
-    // Realtime Subscription (Optional, tapi bagus untuk update instan)
+    // Realtime Subscription — pakai debounce agar tidak flood saat banyak siswa update bersamaan
     const channel = supabase
         .channel('monitor_changes')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'student_exam_sessions' }, () => fetchSessions(true))
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, () => fetchLockedUsers(true))
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'student_exam_sessions' }, debouncedFetchSessions)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'users' }, debouncedFetchLockedUsers)
         .subscribe();
 
     return () => {

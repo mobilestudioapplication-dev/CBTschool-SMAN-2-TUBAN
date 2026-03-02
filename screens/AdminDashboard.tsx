@@ -182,14 +182,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         { data: schedulesData, error: schedulesError },
         { data: sessionsData, error: sessionsError },
       ] = await Promise.all([
-        supabase.from('users').select('*'),
-        supabase.from('tests').select('*, questions:questions(count)'), // Hanya ambil count
+        supabase.from('users').select('id, username, qr_login_password, full_name, nisn, class, major, gender, religion, photo_url, updated_at, password_text, role'),
+        supabase.from('tests').select('*, questions:questions(count)'),
         supabase.from('master_classes').select('*'),
         supabase.from('master_majors').select('*'),
-        supabase.from('announcements').select('*').order('created_at', { ascending: false }),
+        supabase.from('announcements').select('*').order('created_at', { ascending: false }).limit(50),
         supabase.from('schedules').select('*'),
-        // Deep select to ensure we have test_id even if schedules list is partial
-        supabase.from('student_exam_sessions').select('*, schedule:schedules(test_id)'),
+        supabase.from('student_exam_sessions').select('id, user_id, schedule_id, status, progress, time_left_seconds, violations, started_at, schedule:schedules(test_id)'),
       ]);
 
       if (usersError || testsError || classesError || majorsError || announcementsError || schedulesError || sessionsError) {

@@ -135,7 +135,7 @@ const App: React.FC = () => {
 
         try {
             // Ambil data detail dari public.users
-            const { data: profile } = await supabase.from('users').select('*').eq('id', user.id).single();
+            const { data: profile } = await supabase.from('users').select('id, full_name, nisn, class, major, gender, religion, photo_url, role, username, updated_at').eq('id', user.id).single();
             if (profile) {
                 // PRIORITAS 1: Role dari database public
                 dbRole = profile.role || 'student';
@@ -449,7 +449,7 @@ const App: React.FC = () => {
         // 1. Cari user di database untuk mendapatkan data profil
         const { data: dbUser, error: dbError } = await supabase
             .from('users')
-            .select('*')
+            .select('id, full_name, nisn, class, major, gender, religion, photo_url, password_text, qr_login_password, role, username, is_active, active_device_id')
             .or(`nisn.eq.${nisn.trim()},username.eq.${nisn.trim()}`)
             .maybeSingle();
 
