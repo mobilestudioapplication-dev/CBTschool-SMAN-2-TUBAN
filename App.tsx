@@ -449,11 +449,12 @@ const App: React.FC = () => {
         // 1. Cari user di database untuk mendapatkan data profil
         const { data: dbUser, error: dbError } = await supabase
             .from('users')
-            .select('id, full_name, nisn, class, major, gender, religion, photo_url, password_text, qr_login_password, role, username, is_active, active_device_id')
+            .select('id, full_name, nisn, class, major, gender, religion, photo_url, password_text, qr_login_password, role, username, active_device_id')
             .or(`nisn.eq.${nisn.trim()},username.eq.${nisn.trim()}`)
             .maybeSingle();
 
-        if (dbError || !dbUser) return "Data tidak ditemukan di database sekolah.";
+        if (dbError) return "Gagal mengambil data dari server: " + dbError.message;
+        if (!dbUser) return "Data siswa tidak ditemukan. Periksa NISN Anda.";
 
         // 2. Cek password manual (Validasi utama terhadap tabel users)
         const storedPass = dbUser.password_text || dbUser.qr_login_password || dbUser.nisn;
